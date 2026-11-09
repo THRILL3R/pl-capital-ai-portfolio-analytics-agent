@@ -1,0 +1,22 @@
+# Essential Dependencies
+google-genai>=0.10.0
+python-dotenv>=1.0.0
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Built-in modules used: sqlite3, os, re, typing
+
+# Optional Dependencies (for advanced extensions)
+scipy>=1.10.0          # For advanced statistical calculations in portfolio risk tools
+matplotlib>=3.7.0      # For optional portfolio risk visualizations
+seaborn>=0.12.0        # For enhanced plotting in portfolio analysis
+
+# FastAPI Extension Dependencies (bonus feature)
+fastapi>=0.104.0       # Web framework for REST API
+uvicorn>=0.24.0        # ASGI server for FastAPI
+pydantic>=2.5.0        # Data validation and serialization
+
+# Optional (if you want to add testing)
+pytest>=7.4.0
+httpx>=0.25.0          # For testing FastAPI endpoints

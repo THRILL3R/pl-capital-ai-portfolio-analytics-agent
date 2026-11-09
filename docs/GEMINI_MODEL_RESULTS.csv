@@ -1,0 +1,89 @@
+rank,model_id,display_name,description,supported_actions,input_token_limit,output_token_limit,compatible,exclusion_reason,tier,tier_label,free_tier,paid_price,test_status,error_category,http_code,error_message,response_time_s,finish_reason,output_tokens,thinking_tokens,answer,quality_score,quality_notes
+1,gemini-4-argon,Gemini 4 Argon,Gemini 4 Argon,generateContent;countTokens;batchGenerateContent,1048576,32768,True,,1,Flagship / advanced reasoning,paid,$2.00 in / $10.00 out per 1M (to 2026-11-30),skipped_paid,,,,,,,,,,
+2,gemini-3.8-flash,Gemini 3.8 Flash,Gemini 3.8 Flash,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,3,High-capability Flash,free,$0.75 in / $3.75 out per 1M (to 2026-12-31),failed,deadline_exceeded,504,"504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}",58.47,,,,,,
+3,gemini-3.7-flash,Gemini 3.7 Flash,Gemini 3.7 Flash,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,3,High-capability Flash,unverified,,skipped_unverified,,,,,,,,,,
+4,gemini-3.6-flash,Gemini 3.6 Flash,Gemini 3.6 Flash,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,3,High-capability Flash,free,$0.75 in / $3.75 out per 1M (to 2026-12-31),success,,,,8.63,MAX_TOKENS,361,659,"To calculate the **Technology sector exposure** in an investment portfolio, follow this step-by-step methodology:
+
+### 1. Formula
+$$\text{Tech Sector Exposure (\%)} = \left( \frac{\text{Total Market Value of Tech Allocation}}{\text{Total Portfolio Market Value (NAV)}} \right) \times 100$$
+
+---
+
+### 2. Analytical Steps
+
+1. **Classify Holdings via Sector Taxonomy:**
+   Map all individual assets (equities, corporate bonds, options) to the Technology sector using a standardized classification framework such as **GICS** (Global Industry Classification Standard) or **ICB** (Industry Classification Benchmark).
+
+2. **Apply Look-Through Analysis for Pooled Funds:**
+   For mutual funds, ETFs, or index products, perform a look-through calculation to extract the underlying Tech exposure:
+   $$\text{Fund Tech Value} = \text{Market Value of Fund} \times \text{Fund's Tech Sector Weight (\%)}$$
+
+3. **Incorporate Derivatives (If Applicable):**
+   Convert options, futures, or swaps into their **delta-adjusted exposure** (Notional Value $\times$ Delta) to reflect true economic exposure to the sector.
+
+4. **Aggregate Total Tech Market Value:**
+   Sum the market values of:
+   * Direct tech equities/bonds
+   * Look-through tech exposure from funds
+   * Net delta-adjusted tech derivative exposure
+
+5. **Calculate Final Exposure Percentage:**
+   Divide the total Tech market value by the portfolio’s Net Asset Value (NAV) for **Net Exposure**, or by total unhedged long + short positions for **Gross Exposure**.
+
+---
+
+### Key Technical Consideration
+*",4,"Deepest content (GICS/ICB, look-through, delta-adjusted derivatives, net vs gross). Not concise and truncated mid-section: 659 of 1024 output tokens spent on thinking (finish MAX_TOKENS)."
+5,gemini-3.5-flash,Gemini 3.5 Flash,Gemini 3.5 Flash,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,3,High-capability Flash,unverified,,skipped_unverified,,,,,,,,,,
+6,gemini-3.5-flash-lite,Gemini 3.5 Flash Lite,Gemini 3.5 Flash Lite,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,5,Flash-Lite,free,$0.30 in / $2.50 out per 1M,success,,,,1.94,STOP,277,,"To calculate Technology sector exposure in an investment portfolio, follow these steps:
+
+1. **Classify Holdings:** Map every asset in the portfolio to the Global Industry Classification Standard (GICS) or an equivalent taxonomy to identify technology-specific holdings (e.g., GICS Sector 45 - Information Technology). *Note: Consider whether to include adjacent sectors like Communication Services or Consumer Discretionary (e.g., internet/ecommerce giants).*
+2. **Determine Asset Weights:** Calculate the current market value of each holding divided by the total portfolio market value.
+3. **Aggregate Weights:** Sum the percentage weights of all identified technology holdings.
+
+$$\text{Tech Exposure (\%)} = \frac{\sum \text{Market Value of Tech Holdings}}{\text{Total Portfolio Market Value}} \times 100$$
+
+**Advanced Adjustment (Look-Through Exposure):**
+For accurate institutional analytics, use ""look-through"" analysis for indirect holdings (e.g., mutual funds, ETFs, or derivatives). Multiply the weight of each fund in the portfolio by the underlying fund's specific technology weight, then sum these contributions alongside direct stock holdings:
+
+$$\text{Total Tech Exposure} = \sum (\text{Direct Tech Weights}) + \sum (\text{Fund Weight} \times \text{Fund's Tech Weight})$$",5,"Correct, concise, complete: GICS sector 45, weight aggregation formula, look-through formula, note on adjacent sectors. Followed the instruction best."
+7,gemini-3.1-flash-lite,Gemini 3.1 Flash Lite,Gemini 3.1 Flash Lite,generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,5,Flash-Lite,free,$0.25 in / $1.50 out per 1M,success,,,,2.13,STOP,269,,"To calculate Technology sector exposure, follow these steps:
+
+### 1. Categorize Holdings
+Identify each security in the portfolio according to a standardized industry classification system, such as **GICS** (Global Industry Classification Standard). Assign each holding to its primary sector (e.g., Information Technology).
+
+### 2. Calculate Position Weight
+Determine the market value for each individual holding ($V_i$) relative to the total portfolio market value ($V_p$):
+$$w_i = \frac{V_i}{V_p}$$
+
+### 3. Aggregate Sector Weight
+Sum the weights of all individual holdings classified within the Technology sector:
+$$\text{Tech Exposure} = \sum w_{\text{tech}}$$
+
+### 4. Account for Derivatives (Optional but Recommended)
+If the portfolio contains derivatives (e.g., index futures or options), calculate the **Delta-Adjusted Notional Exposure** to ensure the sector allocation reflects the economic risk of the synthetic positions, not just the capital deployed.
+
+***
+
+**Key Considerations:**
+* **Look-through Analysis:** If holding funds or ETFs, decompose the positions into their underlying constituent sectors rather than classifying the fund as a single asset.
+* **Basis:** Ensure consistent use of Market Value (Net Asset Value) across all calculations.",4.5,"Correct and well structured (weights, aggregation, derivatives, look-through). Minor imprecision: equates portfolio market value with NAV."
+8,gemini-2.5-pro,Gemini 2.5 Pro,"Stable release (June 17th, 2025) of Gemini 2.5 Pro",generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,6,Older compatible Gemini,free,$1.25 in / $10.00 out per 1M (deprecated; routes to gemini-3.8-flash from 2026-12-01),failed,model_not_found,404,"404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-pro is no longer available to new users. Please update your code to use models/gemini-3.1-pro-preview for the latest features and improvements. We recommend you to use the Interactions API (https://aistudio.google.com/do",0.42,,,,,,
+9,gemini-2.5-flash,Gemini 2.5 Flash,"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.",generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,6,Older compatible Gemini,free,$0.30 in / $2.50 out per 1M (deprecated; routes to gemini-3.5-flash-lite from 2026-12-01),failed,model_not_found,404,"404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements. We recommend you to use the Interactions API (https://aistudio.google.com/docs/g",0.39,,,,,,
+10,gemini-2.5-flash-lite,Gemini 2.5 Flash-Lite,"Stable version of Gemini 2.5 Flash-Lite, released in July of 2025",generateContent;countTokens;createCachedContent;batchGenerateContent,1048576,65536,True,,6,Older compatible Gemini,free,$0.10 in / $0.40 out per 1M,failed,model_not_found,404,"404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use models/gemini-3.5-flash-lite for the latest features and improvements. We recommend you to use the Interactions API (https://aistudio.google.",0.42,,,,,,
+11,gemini-3.1-flash-image,Nano Banana 2,Gemini 3.1 Flash Image.,generateContent;countTokens;batchGenerateContent,65536,65536,False,specialised task model ('image'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+12,gemini-3.1-flash-lite-image,Nano Banana 2 Lite,Gemini 3.1 Flash Lite Image.,generateContent;countTokens;batchGenerateContent,65536,65536,False,specialised task model ('image'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+13,gemini-3-pro-image,Nano Banana Pro,Gemini 3 Pro Image,generateContent;countTokens;batchGenerateContent,131072,32768,False,specialised task model ('image'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+14,gemini-2.5-flash-image,Nano Banana,Gemini 2.5 Flash Preview Image,generateContent;countTokens;batchGenerateContent,32768,32768,False,specialised task model ('image'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+15,deep-research-pro-preview-12-2025,Deep Research Pro Preview (Dec-12-2025) [Rerouted],Deprecated preview agent; automatically rerouting traffic to deep-research-preview-04-2026.,generateContent;countTokens,131072,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+16,antigravity-preview-05-2026,Antigravity Agent Preview,Preview release of Antigravity Agent (05-2026),generateContent;countTokens,1048576,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+17,antigravity-preview-09-2026,Antigravity Agent Preview,Preview release of Antigravity Agent (09-2026),generateContent;countTokens,1048576,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+18,antigravity-preview-latest,Antigravity Agent Preview Latest,Latest preview release of Antigravity Agent,generateContent;countTokens,1048576,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+19,deep-research-max-preview-04-2026,Deep Research Max Preview (Apr-21-2026),"Preview release (April 21st, 2026) of Deep Research Max",generateContent;countTokens,131072,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+20,deep-research-preview-04-2026,Deep Research Preview (Apr-21-2026),"Preview release (April 21th, 2026) of Deep Research",generateContent;countTokens,131072,65536,False,"agent / research product, not a gemini-* model",9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+21,gemini-embedding-001,Gemini Embedding 001,Obtain a distributed representation of a text.,embedContent;countTextTokens;countTokens;asyncBatchEmbedContent,2048,1,False,does not support generateContent,9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+22,gemini-embedding-2,Gemini Embedding 2,Obtain a distributed representation of multimodal content.,embedContent;countTextTokens;countTokens;asyncBatchEmbedContent,8192,1,False,does not support generateContent,9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+23,gemini-nano-banana-2.1,Nano Banana 2.1,Gemini Nano Banana 2.1.,generateContent;countTokens;batchGenerateContent,65536,65536,False,specialised task model ('banana'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+24,gemini-omni-flash-preview,Gemini Omni Flash Preview,Gemini Omni Flash Preview,generateContent;countTokens,131072,65536,False,specialised task model ('omni'),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+25,gemma-4-26b-a4b-it,Gemma 4 26B A4B IT,Gemma 4 26B A4B IT,generateContent;countTokens,262144,32768,False,Gemma open model (not Gemini),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
+26,gemma-4-31b-it,Gemma 4 31B IT,Gemma 4 31B IT,generateContent;countTokens,262144,32768,False,Gemma open model (not Gemini),9,Other / unclassified,unverified,,excluded,,,,,,,,,,
