@@ -1,0 +1,47 @@
+@import '@fontsource-variable/figtree';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    @apply bg-surface font-sans text-body-md text-text-primary antialiased;
+    overscroll-behavior: none;
+  }
+  /* Tabular figures for every analytical number (DESIGN.md: Numbers and Metrics). */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid #4c4ccc;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-label-sm font-bold uppercase tracking-[0.25em] text-brand-blue;
+  }
+  .card {
+    @apply rounded-xl bg-surface-base shadow-ambient;
+  }
+  .table-head {
+    @apply bg-surface-table-header text-table-header uppercase text-text-muted;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

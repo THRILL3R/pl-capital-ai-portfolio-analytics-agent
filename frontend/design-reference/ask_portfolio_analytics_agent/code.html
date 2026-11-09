@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><title>PL Capital Portfolio Analytics Agent</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "primary": "#3330b4", "tertiary-fixed": "#e0e0ff", "tertiary-container": "#454dcf", "on-tertiary": "#ffffff", "primary-container": "#4c4ccc", "inverse-primary": "#c1c1ff", "indigo-900": "#07075A", "indigo-750": "#111C74", "on-tertiary-fixed": "#00006e", "on-secondary-container": "#363789", "on-error-container": "#93000a", "chart-series-2": "#4C4CCC", "indigo-850": "#0E0E6A", "secondary-fixed-dim": "#c1c1ff", "status-positive-bg": "#D7FFE5", "border-hairline": "#E2E8F0", "surface-container-highest": "#e0e3e8", "text-primary": "#212529", "status-positive-text": "#22C55E", "on-tertiary-container": "#d3d4ff", "border-table-row": "#F0F0F0", "on-primary": "#ffffff", "status-negative-text": "#E53935", "surface-tint": "#4d4dcd", "on-secondary": "#ffffff", "brand-green": "#1FB15A", "primary-hover": "#3636BC", "chart-series-5": "#3922D1", "lavender-light": "#D0D0FC", "surface-container-high": "#e5e8ee", "inverse-on-surface": "#eef1f6", "on-surface-variant": "#464554", "surface-container": "#ebeef3", "surface-base": "#FFFFFF", "text-secondary": "#555555", "chart-series-8": "#D0D0FC", "on-secondary-fixed-variant": "#3c3d8f", "surface-variant": "#e0e3e8", "indigo-700": "#272756", "status-negative-bg": "#FDECEA", "secondary-fixed": "#e1dfff", "on-primary-container": "#d5d3ff", "on-surface": "#181c20", "inverse-surface": "#2d3135", "on-tertiary-fixed-variant": "#2b32b7", "secondary": "#5455a9", "on-primary-fixed": "#09006b", "primary-fixed": "#e1dfff", "primary-fixed-dim": "#c1c1ff", "violet-accent": "#3922D1", "on-background": "#181c20", "surface-table-header": "#F7F7F7", "tertiary": "#2a31b7", "chart-series-6": "#272756", "error-container": "#ffdad6", "background": "#f7f9ff", "indigo-650": "#2C2C89", "lavender-input": "#E8E8FF", "error": "#ba1a1a", "chart-series-7": "#6B7280", "brand-blue": "#0000A0", "chart-series-4": "#B6B6F7", "on-error": "#ffffff", "on-primary-fixed-variant": "#3331b4", "lavender-callout": "#F5F5FF", "surface-bright": "#f7f9ff", "surface-container-lowest": "#ffffff", "surface": "#f7f9ff", "outline": "#777585", "indigo-950": "#001A66", "indigo-800": "#0F0F83", "chart-series-3": "#7D7DD0", "text-muted": "#6B7280", "surface-container-low": "#f1f4f9", "tertiary-fixed-dim": "#bfc2ff", "secondary-container": "#a4a5ff", "chart-series-1": "#0000A0", "on-secondary-fixed": "#0c0664", "surface-dim": "#d7dadf", "outline-variant": "#c7c4d6" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter": "1rem", "space-sm": "0.5rem", "space-md": "1rem", "margin-lg": "2rem", "space-xl": "2rem", "space-lg": "1.5rem", "gutter-lg": "1.5rem", "space-xs": "0.25rem", "margin": "1rem", "margin-md": "1.5rem" }, "fontFamily": { "display-hero-mobile": ["Hanken Grotesk"], "label-md": ["Hanken Grotesk"], "headline-sm": ["Hanken Grotesk"], "display-hero": ["Hanken Grotesk"], "table-cell": ["Hanken Grotesk"], "body-md": ["Hanken Grotesk"], "body-sm": ["Hanken Grotesk"], "table-header": ["Hanken Grotesk"], "headline-md": ["Hanken Grotesk"], "body-lg": ["Hanken Grotesk"], "label-sm": ["Hanken Grotesk"], "headline-kpi-mobile": ["Hanken Grotesk"], "headline-kpi": ["Hanken Grotesk"], "headline-lg": ["Hanken Grotesk"], "label-lg": ["Hanken Grotesk"] }, "fontSize": { "display-hero-mobile": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.015em", "fontWeight": "800" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "display-hero": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "table-cell": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "table-header": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "headline-kpi-mobile": ["26px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "headline-kpi": ["32px", { "lineHeight": "38px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }] } } } };</script></head><body class="bg-surface font-body-md text-text-primary antialiased min-h-screen flex flex-col"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-base border-b border-border-hairline shadow-[0_2px_8px_rgba(39,39,86,0.06)]"><div class="h-[68px] max-w-[1200px] mx-auto px-4 flex items-center justify-between gap-6"><div class="flex items-center gap-3 shrink-0"><img alt="PL Capital Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/ALJJyrBzEbfWS5jA9W1iSHyql3oGRUp5leQimPsiTvAO0E82JdNdM951m_8HbKv0mYXUcKPa2tP8tRzJbU9VxVzc2LFdu5owJOHK2CSFlSvcUkX8PeSWOvnDtT1TrNr--JddazdK4qoZwtLSsv84DV7ofQO3R0_mcAQldQyGj1tMtJWw2pux1Uu27AqzvDBKtaxEC9qAFEfkRZDLPNWZS4DxGV3Hxn1z0xqv-9im8YrWeag"/><div class="w-px h-6 bg-border-hairline"></div><span class="font-label-lg text-[15px] font-semibold tracking-tight text-indigo-800">Portfolio Analytics Agent</span></div><nav class="hidden md:flex items-center gap-6 h-full" data-active-classes="text-brand-blue border-b-2 border-brand-blue font-semibold"><a aria-current="page" class="inline-flex items-center h-full px-1 transition-colors text-brand-blue border-b-2 border-brand-blue font-semibold" data-path="ask" href="#">Ask</a><a class="inline-flex items-center h-full px-1 border-b-2 border-transparent font-label-lg text-indigo-800 hover:text-brand-blue transition-colors" data-path="portfolios" href="#">Portfolios</a><a class="inline-flex items-center h-full px-1 border-b-2 border-transparent font-label-lg text-indigo-800 hover:text-brand-blue transition-colors" data-path="exposure" href="#">Exposure</a><a class="inline-flex items-center h-full px-1 border-b-2 border-transparent font-label-lg text-indigo-800 hover:text-brand-blue transition-colors" data-path="evaluation" href="#">Evaluation</a><a class="inline-flex items-center h-full px-1 border-b-2 border-transparent font-label-lg text-indigo-800 hover:text-brand-blue transition-colors" data-path="about" href="#">About</a></nav><div class="flex items-center gap-4 shrink-0"><div class="hidden sm:inline-flex items-center gap-1.5 bg-lavender-callout border border-lavender-light text-indigo-700 font-label-md rounded-full px-3 py-1"><span>Sample dataset · 603 rows</span></div><a class="font-label-md text-violet-accent hover:text-primary transition-colors" data-path="how-it-works" href="#">How it works</a><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div><div class="bg-lavender-callout border-t border-b border-border-hairline py-1.5 px-6"><p class="font-body-sm text-center text-text-secondary font-medium">Sample assessment dataset (US-listed, USD). Analytics only — not investment advice.</p></div></header><main class="flex-1 w-full pt-[97px] bg-surface"><div class="max-w-[1200px] mx-auto px-4 py-6"><div class="flex flex-col w-full">
+<!-- Breadcrumb & Eyebrow Header -->
+<div class="mb-6">
+<nav class="flex items-center gap-1.5 font-label-md text-text-muted mb-2 select-none">
+<span class="hover:text-primary transition-colors cursor-pointer">Home</span>
+<span class="text-text-muted">›</span>
+<span class="text-indigo-800 font-semibold">Ask</span>
+</nav>
+<div class="font-label-sm uppercase tracking-[0.25em] text-brand-blue font-bold mb-1">
+      ASK THE AGENT
+    </div>
+<h1 class="font-headline-kpi text-indigo-800 tracking-tight">
+      Ask a question about your portfolios
+    </h1>
+</div>
+<!-- Dual Column Layout: Canvas + Query Inspector Panel -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Primary Conversation Canvas (approx 740px / 8 cols) -->
+<div class="lg:col-span-8 flex flex-col gap-6">
+<!-- Interactive Question Composer -->
+<section class="bg-surface-base rounded-xl p-5 shadow-sm">
+<form class="relative flex items-center w-full" id="ask-form" onsubmit="event.preventDefault();">
+<span class="material-symbols-outlined absolute left-4 text-indigo-700 pointer-events-none text-[22px]">
+            search
+          </span>
+<input class="w-full h-14 pl-12 pr-32 bg-surface border-0 rounded-full font-body-md text-text-primary placeholder:text-text-muted focus:outline-none focus:bg-surface-base focus:ring-2 focus:ring-primary shadow-inner transition-all" id="query-input" placeholder="Ask about portfolios, holdings or sector exposure…" type="text" value="Show top 5 holdings by cost basis in the Growth Equity Fund"/>
+<button class="absolute right-1.5 h-11 px-6 rounded-full text-on-primary font-label-lg tracking-wide shadow-sm hover:opacity-95 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer" style="background: linear-gradient(144deg, #4C4CCC 40.85%, #0000A0 98.66%);" type="submit">
+<span>Ask</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</form>
+<!-- Dynamic Query Suggestion Chips -->
+<div class="mt-4">
+<div class="font-table-header uppercase tracking-[0.15em] text-text-muted mb-2">
+            TRY ASKING
+          </div>
+<div class="flex flex-wrap gap-2">
+<button class="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-lavender-callout text-indigo-800 font-label-md hover:bg-lavender-input transition-colors text-left cursor-pointer" onclick="fillQuery('How many portfolios do we have in total?')" type="button">
+<span>How many portfolios do we have in total?</span>
+<span class="material-symbols-outlined text-[14px] text-indigo-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">north_east</span>
+</button>
+<button class="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-lavender-callout text-indigo-800 font-label-md hover:bg-lavender-input transition-colors text-left cursor-pointer" onclick="fillQuery('Names of all active portfolios')" type="button">
+<span>Names of all active portfolios</span>
+<span class="material-symbols-outlined text-[14px] text-indigo-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">north_east</span>
+</button>
+<button class="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-lavender-callout text-indigo-800 font-label-md hover:bg-lavender-input transition-colors text-left cursor-pointer" onclick="fillQuery('Top 5 holdings by cost basis in Growth Equity Fund')" type="button">
+<span>Top 5 holdings by cost basis in Growth Equity Fund</span>
+<span class="material-symbols-outlined text-[14px] text-indigo-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">north_east</span>
+</button>
+<button class="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-lavender-callout text-indigo-800 font-label-md hover:bg-lavender-input transition-colors text-left cursor-pointer" onclick="fillQuery('Sector exposures for Tech Innovation Fund')" type="button">
+<span>Sector exposures for Tech Innovation Fund</span>
+<span class="material-symbols-outlined text-[14px] text-indigo-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">north_east</span>
+</button>
+<button class="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-lavender-callout text-indigo-800 font-label-md hover:bg-lavender-input transition-colors text-left cursor-pointer" onclick="fillQuery('Calculate sector exposure breakdown for international equity')" type="button">
+<span>Calculate sector exposure breakdown for international equity</span>
+<span class="material-symbols-outlined text-[14px] text-indigo-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">north_east</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Active Thread / Verification Stream -->
+<section class="flex flex-col">
+<!-- User Query Bubble -->
+<div class="flex justify-end mb-4">
+<div class="bg-lavender-input text-indigo-800 font-body-lg font-medium px-5 py-3 rounded-2xl rounded-tr-sm max-w-[540px] shadow-sm">
+            Show top 5 holdings by cost basis in the Growth Equity Fund
+          </div>
+</div>
+<!-- Verified Agent Response Container -->
+<div class="bg-surface-base rounded-xl p-6 shadow-sm">
+<!-- Metadata / Action Header Bar -->
+<div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 bg-surface-container-lowest">
+<div class="flex items-center flex-wrap gap-2">
+<span class="inline-flex items-center gap-1 bg-lavender-callout text-primary-container font-label-sm font-semibold px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[14px]">terminal</span>
+                SQL Query Tool
+              </span>
+<span class="inline-flex items-center gap-1 bg-indigo-800 text-on-primary font-label-sm font-semibold px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                Gemini
+              </span>
+<span class="inline-flex items-center gap-1 bg-status-positive-bg text-brand-green font-label-sm font-bold px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                SUCCESS
+              </span>
+</div>
+<!-- CSV Export / Action -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-low hover:bg-surface-container text-indigo-800 font-label-md rounded-full transition-all cursor-pointer" id="copy-csv-btn" onclick="copyTableCSV()" type="button">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+<span id="copy-btn-text">Copy as CSV</span>
+</button>
+</div>
+<!-- Plain-Language Summary Headline -->
+<div class="font-headline-sm text-text-primary mb-4 flex items-baseline justify-between flex-wrap gap-2">
+<span>Top 5 holdings by cost basis in Growth Equity Fund</span>
+<span class="font-label-md text-text-secondary bg-surface-container-low px-2.5 py-0.5 rounded-full">Total cost basis: $1,435,840</span>
+</div>
+<!-- Structured Result Table with Integrated Graphic Bar -->
+<div class="overflow-x-auto rounded-lg bg-surface-container-lowest">
+<table class="w-full text-left font-table-cell">
+<thead>
+<tr class="bg-surface-table-header font-table-header uppercase text-text-muted">
+<th class="px-4 py-3">Ticker</th>
+<th class="px-4 py-3">Company Name</th>
+<th class="px-4 py-3 text-right">Shares</th>
+<th class="px-4 py-3 text-right">Cost Basis</th>
+<th class="px-4 py-3 text-right">Current Price</th>
+<th class="px-4 py-3 text-right">Unrealized Gain / Loss</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="px-4 py-3.5 font-label-lg text-indigo-800">AAPL</td>
+<td class="px-4 py-3.5 text-text-primary">Apple Inc.</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">2,400</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-primary font-medium">$438,000</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">$189.50</td>
+<td class="px-4 py-3.5 text-right">
+<span class="inline-flex items-center gap-1 font-label-sm font-semibold text-status-positive-text bg-status-positive-bg px-2 py-0.5 rounded-full">
+                      +$16,800 (+3.84%)
+                    </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="px-4 py-3.5 font-label-lg text-indigo-800">AMZN</td>
+<td class="px-4 py-3.5 text-text-primary">Amazon.com Inc.</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">1,800</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-primary font-medium">$320,000</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">$178.20</td>
+<td class="px-4 py-3.5 text-right">
+<span class="inline-flex items-center gap-1 font-label-sm font-semibold text-status-positive-text bg-status-positive-bg px-2 py-0.5 rounded-full">
+                      +$760 (+0.24%)
+                    </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="px-4 py-3.5 font-label-lg text-indigo-800">MSFT</td>
+<td class="px-4 py-3.5 text-text-primary">Microsoft Corp.</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">800</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-primary font-medium">$304,400</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">$415.00</td>
+<td class="px-4 py-3.5 text-right">
+<span class="inline-flex items-center gap-1 font-label-sm font-semibold text-status-positive-text bg-status-positive-bg px-2 py-0.5 rounded-full">
+                      +$27,600 (+9.07%)
+                    </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="px-4 py-3.5 font-label-lg text-indigo-800">NVDA</td>
+<td class="px-4 py-3.5 text-text-primary">NVIDIA Corp.</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">320</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-primary font-medium">$288,040</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">$920.00</td>
+<td class="px-4 py-3.5 text-right">
+<span class="inline-flex items-center gap-1 font-label-sm font-semibold text-status-positive-text bg-status-positive-bg px-2 py-0.5 rounded-full">
+                      +$6,360 (+2.21%)
+                    </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="px-4 py-3.5 font-label-lg text-indigo-800">CRM</td>
+<td class="px-4 py-3.5 text-text-primary">Salesforce Inc.</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">600</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-primary font-medium">$185,400</td>
+<td class="px-4 py-3.5 text-right font-mono text-text-secondary">$302.10</td>
+<td class="px-4 py-3.5 text-right">
+<span class="inline-flex items-center gap-1 font-label-sm font-semibold text-status-negative-text bg-status-negative-bg px-2 py-0.5 rounded-full">
+                      -$4,140 (-2.23%)
+                    </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Meta -->
+<div class="flex items-center justify-between text-text-muted font-body-sm mt-3 px-1">
+<span>Showing 5 rows · USD currency</span>
+<span class="text-text-secondary font-medium">Weighted Return: +3.29%</span>
+</div>
+<!-- Micro Allocation Chart (SVG Visual richness) -->
+<div class="mt-5 p-3.5 bg-surface-container-lowest rounded-lg">
+<div class="flex justify-between items-center mb-1.5">
+<span class="font-table-header uppercase text-text-muted">Relative Cost Basis Allocation</span>
+<span class="font-label-sm text-indigo-800 font-semibold">100% of Top 5 Sample</span>
+</div>
+<div class="h-3 w-full bg-surface-container-high rounded-full overflow-hidden flex">
+<!-- AAPL 30.5% -->
+<div class="h-full bg-brand-blue" style="width: 30.5%;" title="AAPL: 30.5%"></div>
+<!-- AMZN 22.3% -->
+<div class="h-full bg-chart-series-2" style="width: 22.3%;" title="AMZN: 22.3%"></div>
+<!-- MSFT 21.2% -->
+<div class="h-full bg-chart-series-3" style="width: 21.2%;" title="MSFT: 21.2%"></div>
+<!-- NVDA 20.1% -->
+<div class="h-full bg-chart-series-4" style="width: 20.1%;" title="NVDA: 20.1%"></div>
+<!-- CRM 12.9% / proportional normalize -->
+<div class="h-full bg-chart-series-8" style="width: 12.9%;" title="CRM: 12.9%"></div>
+</div>
+<div class="flex items-center gap-4 mt-2 font-label-sm text-text-secondary">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-brand-blue"></span>AAPL (30.5%)</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-chart-series-2"></span>AMZN (22.3%)</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-chart-series-3"></span>MSFT (21.2%)</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-chart-series-4"></span>NVDA (20.1%)</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-chart-series-8"></span>CRM (12.9%)</span>
+</div>
+</div>
+<!-- Collapsible Agent Reasoning & Generated SQL -->
+<div class="mt-5 space-y-3">
+<div class="bg-surface-container-low rounded-lg p-4">
+<div class="flex items-center justify-between mb-2">
+<span class="font-table-header uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-indigo-700">database</span>
+                  GENERATED SQL
+                </span>
+<button class="font-label-sm text-violet-accent hover:text-primary transition-colors flex items-center gap-1 cursor-pointer" id="sql-copy-btn" onclick="copySQL()" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span>Copy SQL</span>
+</button>
+</div>
+<pre class="bg-surface-base text-indigo-900 font-mono text-[12px] leading-relaxed p-3 rounded-md overflow-x-auto selection:bg-lavender-light"><code>SELECT
+  s.ticker,
+  s.name,
+  h.shares,
+  h.cost_basis,
+  s.current_price,
+  (h.shares * s.current_price - h.cost_basis) as unrealized_pnl
+FROM holdings h
+JOIN securities s ON h.security_id = s.id
+JOIN portfolios p ON h.portfolio_id = p.id
+WHERE p.name = ?
+ORDER BY h.cost_basis DESC
+LIMIT 5;</code></pre>
+<div class="mt-2.5 flex items-center gap-2">
+<span class="font-label-sm text-text-muted">Bound Parameter:</span>
+<span class="bg-lavender-input text-indigo-800 font-mono text-label-sm px-2 py-0.5 rounded font-semibold">
+                  param_1: "Growth Equity Fund"
+                </span>
+</div>
+</div>
+<!-- Agent Explanation Note -->
+<div class="bg-lavender-callout rounded-lg p-3.5 flex items-start gap-2.5">
+<span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">info</span>
+<p class="font-body-sm text-text-secondary">
+<strong class="font-semibold text-indigo-900">How this was computed:</strong> Joined holdings to securities and filtered for portfolio <code class="bg-surface-base px-1.5 py-0.5 rounded text-indigo-800 font-mono text-[11px]">'Growth Equity Fund'</code>, sorted descending by <code class="bg-surface-base px-1.5 py-0.5 rounded text-indigo-800 font-mono text-[11px]">cost_basis</code> with limit 5.
+              </p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Secondary Inspector & Safeguards Rail (approx 360px / 4 cols) -->
+<div class="lg:col-span-4 flex flex-col gap-4">
+<!-- Query Details Inspection Card -->
+<section class="bg-surface-base rounded-xl p-5 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="font-label-sm uppercase tracking-[0.2em] text-brand-blue font-bold">
+            QUERY DETAILS
+          </div>
+<span class="material-symbols-outlined text-text-muted text-[18px]">readiness_score</span>
+</div>
+<dl class="space-y-2.5 font-body-sm">
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Status</dt>
+<dd class="font-label-sm font-bold text-brand-green flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-green"></span>
+              success
+            </dd>
+</div>
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Tool</dt>
+<dd class="font-label-sm font-semibold text-text-primary">SQL Query Tool</dd>
+</div>
+<div class="flex flex-col py-1 bg-surface-container-lowest gap-0.5">
+<dt class="text-text-muted">Route reason</dt>
+<dd class="font-body-sm text-indigo-800 font-medium">Matched tabular holding cost query</dd>
+</div>
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Method</dt>
+<dd class="font-label-sm font-semibold text-text-primary">gemini</dd>
+</div>
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Model</dt>
+<dd class="font-mono text-label-sm text-indigo-700 bg-surface-container-low px-2 py-0.5 rounded">gemini-3.5-flash-lite</dd>
+</div>
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Fallback used</dt>
+<dd class="font-mono text-label-sm text-text-muted">false</dd>
+</div>
+<div class="flex items-center justify-between py-1 bg-surface-container-lowest">
+<dt class="text-text-muted">Rows returned</dt>
+<dd class="font-label-md font-bold text-indigo-800">5</dd>
+</div>
+<div class="flex flex-col py-1 bg-surface-container-lowest gap-0.5">
+<dt class="text-text-muted">Description</dt>
+<dd class="font-body-sm text-text-secondary">Top 5 holdings by cost basis</dd>
+</div>
+</dl>
+</section>
+<!-- Execution Pipeline Visual Stepper -->
+<section class="bg-surface-base rounded-xl p-5 shadow-sm">
+<div class="font-label-sm uppercase tracking-[0.2em] text-brand-blue font-bold mb-4">
+          EXECUTION PIPELINE
+        </div>
+<div class="relative pl-6 space-y-4">
+<!-- Continuous line behind dots -->
+<div class="absolute left-2.5 top-2 bottom-2 w-0.5 bg-lavender-light"></div>
+<!-- Step 1 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Question</span>
+<p class="font-body-sm text-text-muted">Received &amp; sanitized</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Route</span>
+<p class="font-body-sm text-text-muted">Intent: SQL Tool</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Generate SQL</span>
+<p class="font-body-sm text-text-muted">Synthesized parameter query</p>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Validate</span>
+<p class="font-body-sm text-text-muted">AST parsed &amp; keywords audited</p>
+</div>
+</div>
+<!-- Step 5 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Execute</span>
+<p class="font-body-sm text-text-muted">Executed in 18ms</p>
+</div>
+</div>
+<!-- Step 6 -->
+<div class="relative flex items-center gap-3">
+<div class="w-5 h-5 rounded-full bg-brand-blue text-on-primary flex items-center justify-center -ml-6 text-[10px] font-bold shadow-sm">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</div>
+<div>
+<span class="font-label-md font-semibold text-text-primary">Result</span>
+<p class="font-body-sm text-text-muted">5 rows formatted with P&amp;L</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Institutional Safeguards Card -->
+<section class="bg-surface-base rounded-xl p-5 shadow-sm">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-indigo-800 text-[20px]">verified_user</span>
+<h3 class="font-label-md uppercase tracking-wider text-indigo-800 font-bold">
+            SAFEGUARDS (ALWAYS APPLIED)
+          </h3>
+</div>
+<ul class="space-y-2.5 font-body-sm text-text-secondary pl-1">
+<li class="flex items-start gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-700 shrink-0 mt-2"></span>
+<span>Only a single SELECT or WITH statement runs</span>
+</li>
+<li class="flex items-start gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-700 shrink-0 mt-2"></span>
+<span>Comments and write keywords are rejected</span>
+</li>
+<li class="flex items-start gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-700 shrink-0 mt-2"></span>
+<span>Read-only database connection</span>
+</li>
+<li class="flex items-start gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-700 shrink-0 mt-2"></span>
+<span>Literal values are passed as parameters</span>
+</li>
+</ul>
+<div class="mt-4 pt-3 text-[11px] text-text-muted italic bg-surface-container-lowest">
+          Analytical result over a supplied sample dataset. Not investment advice.
+        </div>
+</section>
+</div>
+</div>
+</div>
+<script>
+  function fillQuery(text) {
+    const input = document.getElementById('query-input');
+    if (input) {
+      input.value = text;
+      input.focus();
+      input.classList.add('ring-2', 'ring-primary');
+      setTimeout(() => {
+        input.classList.remove('ring-2', 'ring-primary');
+      }, 400);
+    }
+  }
+
+  function copyTableCSV() {
+    const csvContent =
+`Ticker,Company Name,Shares,Cost Basis,Current Price,Unrealized Gain Loss
+AAPL,Apple Inc.,2400,$438000,$189.50,+$16800 (+3.84%)
+AMZN,Amazon.com Inc.,1800,$320000,$178.20,+$760 (+0.24%)
+MSFT,Microsoft Corp.,800,$304400,$415.00,+$27600 (+9.07%)
+NVDA,NVIDIA Corp.,320,$288040,$920.00,+$6360 (+2.21%)
+CRM,Salesforce Inc.,600,$185400,$302.10,-$4140 (-2.23%)`;
+
+    navigator.clipboard.writeText(csvContent).then(() => {
+      const btnText = document.getElementById('copy-btn-text');
+      const prev = btnText.textContent;
+      btnText.textContent = "Copied!";
+      setTimeout(() => {
+        btnText.textContent = prev;
+      }, 1800);
+    });
+  }
+
+  function copySQL() {
+    const sqlText = `SELECT s.ticker, s.name, h.shares, h.cost_basis, s.current_price, (h.shares * s.current_price - h.cost_basis) as unrealized_pnl FROM holdings h JOIN securities s ON h.security_id = s.id JOIN portfolios p ON h.portfolio_id = p.id WHERE p.name = ? ORDER BY h.cost_basis DESC LIMIT 5;`;
+    navigator.clipboard.writeText(sqlText).then(() => {
+      const btn = document.getElementById('sql-copy-btn');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">check</span><span>Copied</span>`;
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+      }, 1800);
+    });
+  }
+</script></div></main><footer class="w-full bg-surface-base border-t border-border-hairline py-4 px-8 shrink-0"><p class="font-body-sm text-center text-text-muted">Candidate-prepared assessment prototype · Sample data, not PL Capital client data · Version 1.0</p></footer></body></html>

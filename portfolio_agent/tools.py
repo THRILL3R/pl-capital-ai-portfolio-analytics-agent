@@ -113,7 +113,12 @@ class SQLQueryTool:
         )
         return response, None
 
-    def execute(self, question: str) -> Dict[str, Any]:
+    def execute(
+        self,
+        question: str,
+        allow_gemini: bool = True,
+        gemini_skip_reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Execute a natural-language portfolio question.
 
@@ -137,7 +142,11 @@ class SQLQueryTool:
         fallback_used = False
         fallback_reason: Optional[str] = None
 
-        if self.use_gemini:
+        if self.use_gemini and not allow_gemini:
+            # The caller (PortfolioAgent) asked for the deterministic generator only for this question.
+            fallback_used = True
+            fallback_reason = gemini_skip_reason or "Gemini skipped for this question."
+        elif self.use_gemini:
             if self.gemini_generator.is_configured:
                 gemini_response, fallback_reason = self._try_gemini(question)
                 if gemini_response is not None:

@@ -45,7 +45,7 @@ The scan reported only file names; no matched values were printed.
 | `database/*.db`, `-journal`, `-wal`, `-shm`, `*.tmp` | ignored | generated database |
 | `*.log` | ignored | added |
 | `.vscode/`, `.idea/`, `.claude/` | ignored | added |
-| `evaluation_report.md` | **tracked** | deliverable (latest full run: live Gemini, 9/10) |
+| `evaluation_report.md` | **tracked** | historical earlier live run (9/10), labelled as such; the final live result is `docs/EVALUATION_FINAL_LIVE_20261109.md` (10/10) |
 | `evaluation_report_subset.md` | not needed | default output of `--questions` subset runs; publish only if intended |
 
 After `git init`, confirm with:
@@ -81,7 +81,7 @@ ground_truth_dataset.json     (official, unchanged)
 data/*.csv                    (9 official datasets, unchanged)
 portfolio_agent/*.py
 scripts/gemini_smoke_test.py
-tests/*.py                    (149 tests, incl. test_prompt_conventions.py)
+tests/*.py                    (535 tests, incl. test_prompt_conventions.py, test_api.py, test_conversation.py and test_intent_classifier.py)
 docs/ORIGINAL_ASSESSMENT_README.md
 docs/PROJECT_OVERVIEW.md
 docs/GITHUB_READINESS.md
@@ -117,14 +117,13 @@ publish (e.g. `evaluation_report_subset.md` from a targeted run).
      Select-String -Pattern 'AQ\.[0-9A-Za-z_\-]{20,}','AIza[0-9A-Za-z_\-]{35}','GEMINI_API_KEY\s*=\s*(?!your_gemini_api_key_here)\S{12,}' -List |
      Select-Object -ExpandProperty Path
    ```
-4. **Live Gemini status is already recorded** in the README: latest full live run 9/10
-   (`gemini-3.5-flash-lite`, 0 fallbacks) and a targeted Q7 re-test that passed. Optionally, run one
-   more full live evaluation (`.\.venv\Scripts\python.exe evaluate.py --use-llm`, 8 requests).
-   **After rotating the key**, re-run the smoke test or the full live evaluation to confirm the new
-   key works. Update the README only with results that were actually obtained; do not present the
-   Q7 subset pass as a full 10/10.
+4. **Live Gemini status is already recorded** in the README: the final full live run scored **10/10**
+   (`gemini-3.5-flash-lite`, Q1–Q8 Gemini-generated SQL, 0 fallbacks, Q9–Q10 deterministic;
+   `docs/EVALUATION_FINAL_LIVE_20261109.md`). The earlier 9/10 run and the targeted Q7 re-test are kept as
+   historical records. **After rotating the key**, re-run the smoke test or a live evaluation to confirm the
+   new key works. Update the README only with results that were actually obtained.
 5. Run the final checks:
-   `python -B -m unittest discover -s tests -t .` (expect 149 OK) and
+   `python -B -m unittest discover -s tests -t .` (expect 535 OK: 0 failures and 0 skipped in the project venv with all requirements installed) and
    `.\.venv\Scripts\python.exe evaluate.py --report docs\EVALUATION_DETERMINISTIC.md` (expect 10/10,
    deterministic). Use `--report` so the deterministic run does not overwrite the live
    `evaluation_report.md`.
@@ -140,7 +139,7 @@ publish (e.g. `evaluation_report_subset.md` from a targeted run).
 - [x] Secret-safe scan finds credentials only in `.env` (2026-11-09; plus the intentional `FAKE_KEY` test fixture)
 - [ ] `git check-ignore` confirms `.env`, `.venv/`, `database/*.db` are ignored
 - [ ] `git add --dry-run .` lists only the files in §4
-- [ ] 149 unit tests pass; deterministic evaluator reports 10/10
-- [ ] README distinguishes deterministic 10/10, latest full live 9/10 and the separate Q7 subset result
+- [ ] 535 unit tests pass (project venv); deterministic evaluator reports 10/10
+- [ ] README distinguishes the deterministic 10/10, the final live 10/10 (`docs/EVALUATION_FINAL_LIVE_20261109.md`) and the historical 9/10 run
 - [ ] README Gemini status matches the latest real live results
 - [ ] No claims of live Gemini verification beyond what was actually run

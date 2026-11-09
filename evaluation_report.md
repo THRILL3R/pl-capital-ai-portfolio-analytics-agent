@@ -1,3 +1,8 @@
+> **HISTORICAL REPORT: superseded, not the final evaluation result.**
+> This is an earlier live Gemini run (2026-11-09 04:03 IST, `gemini-3.5-flash-lite`) in which Q7 failed.
+> It is kept unchanged below for the record. The **final** live evaluation (10/10: Q1-Q8 Gemini-generated SQL,
+> no rule-based fallback; Q9-Q10 deterministic) is [docs/EVALUATION_FINAL_LIVE_20261109.md](docs/EVALUATION_FINAL_LIVE_20261109.md).
+
 # Evaluation Report - PL Capital AI Portfolio Analytics Agent
 
 **Overall score: 9/10** (90%)

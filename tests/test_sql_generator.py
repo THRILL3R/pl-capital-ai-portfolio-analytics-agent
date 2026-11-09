@@ -687,5 +687,230 @@ class TestExposureNoRenormalization(unittest.TestCase):
         )
 
 
+class TestMalformedCteRegression(unittest.TestCase):
+    """
+    Live failure (gemini-3.5-flash-lite, Q7): the model emitted the CTE list and then dropped the final
+    SELECT keyword, so SQLite reported ``near "t": syntax error`` and the answer came from the rule-based
+    fallback. These tests pin that exact statement, the valid counterpart, and the repair behaviour.
+    All Gemini interactions are mocked; none of this is live evidence.
+    """
+
+    # Exact shape of the malformed statement returned by Gemini (no SELECT before "t.portfolio_name").
+    MALFORMED_Q7 = (
+        "WITH portfolio_totals AS (SELECT p.portfolio_id, p.portfolio_name, "
+        "SUM(h.quantity * s.current_price) AS total_portfolio_value "
+        "FROM portfolios p JOIN holdings h ON p.portfolio_id = h.portfolio_id "
+        "JOIN securities s ON h.security_id = s.security_id GROUP BY p.portfolio_id), "
+        "tech_holdings AS (SELECT p.portfolio_id, SUM(h.quantity * s.current_price) AS tech_market_value "
+        "FROM portfolios p JOIN holdings h ON p.portfolio_id = h.portfolio_id "
+        "JOIN securities s ON h.security_id = s.security_id "
+        "JOIN sectors sec ON s.sector_id = sec.sector_id "
+        "WHERE sec.sector_name = ? GROUP BY p.portfolio_id) "
+        "t.portfolio_name, t.tech_market_value, pt.total_portfolio_value, "
+        "ROUND((t.tech_market_value * 100.0) / pt.total_portfolio_value, 2) AS percentage "
+        "FROM tech_holdings t JOIN portfolio_totals pt ON t.portfolio_id = pt.portfolio_id "
+        "ORDER BY percentage DESC"
+    )
+    # The same statement as a correct Gemini-style answer: only the missing keyword is added back and
+    # the join is written properly (portfolio_name comes from the totals CTE).
+    VALID_Q7 = MALFORMED_Q7.replace(") t.portfolio_name, t.tech_market_value,", ") SELECT pt.portfolio_name, t.tech_market_value,")
+    QUESTION = (
+        "For each portfolio, show the total value of Technology sector holdings and what percentage it "
+        "represents of the total portfolio value"
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.db = PortfolioDatabase()
+        if not cls.db.is_initialized():
+            cls.db.initialize_database()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.db.close()
+
+    def _generator(self, client) -> GeminiSQLGenerator:
+        return GeminiSQLGenerator(api_key=FAKE_KEY, client=client, db=self.db)
+
+    def _payload(self, sql):
+        return {"sql": sql, "parameters": ["Technology"], "description": "Technology share per portfolio"}
+
+    def _responses(self, *payloads):
+        client = MagicMock()
+        outs = []
+        for p in payloads:
+            r = MagicMock()
+            r.text = json.dumps(p)
+            outs.append(r)
+        client.models.generate_content.side_effect = outs
+        return client
+
+    # ---- the exact failure ------------------------------------------------------------
+
+    def test_sqlite_itself_rejects_the_exact_malformed_statement(self):
+        """Documents the original failure (SQLite's message) and that it is now stopped before execution."""
+        conn = self.db.get_read_only_connection()  # the raw engine, bypassing every validation layer
+        with self.assertRaises(sqlite3.Error) as raw:
+            conn.execute(self.MALFORMED_Q7, ("Technology",))
+        self.assertIn('near "t"', str(raw.exception))
+        # Through the public path the AST layer rejects it first, without touching the database.
+        with self.assertRaises(ReadOnlyQueryError) as ctx:
+            self.db.execute_read_only(self.MALFORMED_Q7, ("Technology",))
+        self.assertIn("AST validation", str(ctx.exception))
+
+    def test_structure_check_flags_the_exact_malformed_statement(self):
+        problem = sql_generator_module.check_cte_structure(self.MALFORMED_Q7)
+        self.assertIsNotNone(problem)
+        self.assertIn("SELECT must follow", problem)
+        self.assertIn("'t.portfolio_name,'", problem)
+
+    def test_parser_rejects_it_before_execution_with_a_specific_category(self):
+        gen = self._generator(MagicMock())
+        with self.assertRaises(GeminiGenerationError) as ctx:
+            gen.parse_gemini_response(json.dumps(self._payload(self.MALFORMED_Q7)))
+        self.assertEqual(ctx.exception.category, "malformed_sql")
+        self.assertEqual(ctx.exception.sql, self.MALFORMED_Q7)
+
+    # ---- the valid counterpart --------------------------------------------------------
+
+    def test_valid_q7_style_cte_passes_validation_and_matches_the_official_query(self):
+        gen = self._generator(MagicMock())
+        parsed = gen.parse_gemini_response(json.dumps(self._payload(self.VALID_Q7)))
+        self.assertIsNone(sql_generator_module.check_cte_structure(parsed["sql"]))
+        got = self.db.execute_read_only(parsed["sql"], tuple(parsed["parameters"]))
+        # Independent expectation: the ground-truth query from the assessment, run on the same database.
+        truth = json.loads((PROJECT_ROOT / "ground_truth_dataset.json").read_text(encoding="utf-8"))["questions"][6]
+        # The official query inlines 'Technology' (it has no '?' placeholder), so it takes no parameters;
+        # the Gemini-style statement above uses a '?' placeholder and keeps its single binding.
+        self.assertNotIn("?", truth["ground_truth"]["sql_query"])
+        self.assertEqual(parsed["parameters"], ["Technology"])
+        expected = self.db.execute_read_only(truth["ground_truth"]["sql_query"])
+        self.assertEqual(got["row_count"], expected["row_count"])
+        by_name = {r["portfolio_name"]: r for r in got["rows"]}
+        for row in expected["rows"]:
+            mine = by_name[row["portfolio_name"]]
+            self.assertAlmostEqual(mine["percentage"], row["tech_percentage"], places=2)
+
+    def test_structure_check_accepts_well_formed_cte_variants(self):
+        ok = [
+            "SELECT 1",
+            "WITH a AS (SELECT 1) SELECT * FROM a",
+            "WITH a AS (SELECT 1), b AS (SELECT 2 FROM (SELECT 3)) SELECT * FROM a, b",
+            "WITH a(x, y) AS (SELECT 1, 2) SELECT x FROM a",
+            "WITH a AS MATERIALIZED (SELECT 1) SELECT * FROM a",
+            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 3) SELECT i FROM n",
+            'WITH "tech totals" AS (SELECT 1) SELECT * FROM "tech totals"',
+            "WITH a AS (SELECT ')' AS paren) SELECT * FROM a",          # parenthesis inside a string literal
+            "with a as (select 1)\n\n  select * from a",
+        ]
+        for sql in ok:
+            with self.subTest(sql=sql):
+                self.assertIsNone(sql_generator_module.check_cte_structure(sql))
+        gen = RuleBasedSQLGenerator()
+        for q in (self.QUESTION, "Find portfolios that have holdings in more than 5 different sectors and show their diversification metrics"):
+            self.assertIsNone(sql_generator_module.check_cte_structure(gen.generate(q)[0]))
+
+    def test_structure_check_flags_other_malformed_ctes(self):
+        bad = {
+            "WITH a AS (SELECT 1) FROM a": "FROM",
+            "WITH a AS (SELECT 1), b AS (SELECT 2) JOIN b ON 1 = 1 SELECT 1": "JOIN",
+            "WITH a AS (SELECT 1) a.x FROM a": "a.x",
+            "WITH a AS (SELECT 1)": "nothing",
+            "WITH a (SELECT 1) SELECT * FROM a": "name AS",
+            "WITH a AS SELECT 1 SELECT * FROM a": "wrapped in parentheses",
+            "WITH a AS (SELECT 1, b AS (SELECT 2) SELECT 1": "unbalanced",
+        }
+        for sql, needle in bad.items():
+            with self.subTest(sql=sql):
+                problem = sql_generator_module.check_cte_structure(sql)
+                self.assertIsNotNone(problem)
+                self.assertIn(needle, problem)
+
+    # ---- prompt constraint ------------------------------------------------------------
+
+    def test_system_instruction_states_the_cte_structure_rules(self):
+        text = self._generator(MagicMock()).build_system_instruction()
+        for needle in (
+            "SQL structure rules",
+            "WITH first_cte AS",
+            "SELECT <result columns>",
+            "NOTHING else may sit between the last CTE's closing ')' and that final",
+            "the final SELECT keyword is",
+        ):
+            self.assertIn(needle, text)
+        # Generic guidance only: no question-specific SQL or answer is embedded.
+        self.assertNotIn("tech_percentage", text)
+        self.assertNotIn("Technology", self.__class__.__dict__.get("_unused", "") + sql_generator_module.GeminiSQLGenerator.SQL_STRUCTURE_RULES)
+
+    # ---- repair behaviour -------------------------------------------------------------
+
+    def test_one_repair_attempt_recovers_from_malformed_sql(self):
+        client = self._responses(self._payload(self.MALFORMED_Q7), self._payload(self.VALID_Q7))
+        result = self._generator(client).generate_structured(self.QUESTION)
+        self.assertEqual(client.models.generate_content.call_count, 2)
+        self.assertEqual(result["sql"], self.VALID_Q7)
+        second = client.models.generate_content.call_args_list[1].kwargs["contents"]
+        self.assertIn("rejected before execution", second)
+        self.assertIn("SELECT must follow", second)
+        self.assertIn("t.portfolio_name, t.tech_market_value", second)  # the rejected SQL is shown to the model
+        self.assertTrue(second.startswith(f"Question: {self.QUESTION}"))
+
+    def test_repair_is_limited_to_one_extra_call(self):
+        client = self._responses(self._payload(self.MALFORMED_Q7), self._payload(self.MALFORMED_Q7), self._payload(self.VALID_Q7))
+        with self.assertRaises(GeminiGenerationError) as ctx:
+            self._generator(client).generate_structured(self.QUESTION)
+        self.assertEqual(ctx.exception.category, "malformed_sql")
+        self.assertEqual(client.models.generate_content.call_count, 2)
+
+    def test_other_failures_are_not_retried(self):
+        for payload in (
+            self._payload("DELETE FROM holdings"),
+            {"sql": "SELECT ?", "parameters": [], "description": "x"},
+            {"sql": "", "parameters": [], "description": "cannot answer"},
+        ):
+            with self.subTest(sql=payload["sql"]):
+                client = self._responses(payload, payload)
+                with self.assertRaises(GeminiGenerationError):
+                    self._generator(client).generate_structured(self.QUESTION)
+                self.assertEqual(client.models.generate_content.call_count, 1)
+
+    def test_valid_sql_needs_a_single_call(self):
+        client = self._responses(self._payload(self.VALID_Q7))
+        self._generator(client).generate_structured(self.QUESTION)
+        self.assertEqual(client.models.generate_content.call_count, 1)
+
+    def test_safety_checks_still_run_before_the_structure_check(self):
+        gen = self._generator(MagicMock())
+        unsafe = "WITH a AS (SELECT 1) DELETE FROM holdings"
+        with self.assertRaises(GeminiGenerationError) as ctx:
+            gen.parse_gemini_response(json.dumps({"sql": unsafe, "parameters": [], "description": ""}))
+        self.assertEqual(ctx.exception.category, "unsafe_sql")
+        with self.assertRaises(GeminiGenerationError) as ctx:  # parameters are still enforced on valid structure
+            gen.parse_gemini_response(json.dumps({"sql": self.VALID_Q7, "parameters": [], "description": ""}))
+        self.assertEqual(ctx.exception.category, "invalid_parameters")
+
+    # ---- tool level: Gemini success is reported separately from fallback ----------------
+
+    def _tool(self, client) -> SQLQueryTool:
+        return SQLQueryTool(db=self.db, gemini_generator=self._generator(client), use_gemini=True)
+
+    def test_repaired_gemini_sql_is_reported_as_gemini_not_fallback(self):
+        client = self._responses(self._payload(self.MALFORMED_Q7), self._payload(self.VALID_Q7))
+        res = self._tool(client).execute(self.QUESTION)
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["generation_method"], "gemini")
+        self.assertFalse(res["fallback_used"])
+        self.assertEqual(res["generated_sql"], self.VALID_Q7)
+
+    def test_persistently_malformed_gemini_sql_falls_back_and_is_labelled_as_fallback(self):
+        client = self._responses(self._payload(self.MALFORMED_Q7), self._payload(self.MALFORMED_Q7))
+        res = self._tool(client).execute(self.QUESTION)
+        self.assertEqual(res["status"], "success")                 # the rule-based answer is correct ...
+        self.assertEqual(res["generation_method"], "rule_based")   # ... but it is never counted as Gemini
+        self.assertTrue(res["fallback_used"])
+        self.assertIn("malformed_sql", res["fallback_reason"])
+        self.assertEqual(res["row_count"], 8)
+
+
 if __name__ == "__main__":
     unittest.main()

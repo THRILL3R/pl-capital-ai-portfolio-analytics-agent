@@ -5,6 +5,13 @@ streamlit>=1.28.0
 pandas>=2.0.0
 numpy>=1.24.0
 
+# Local semantic intent classifier (CPU, ONNX Runtime; no PyTorch). Pinned: model/threshold calibration assumes it.
+fastembed==0.9.1
+
+# SQL AST validation (SQLite dialect): additional read-only safety layer. Pinned: the validator inspects
+# SQLGlot expression classes, so upgrades should be re-tested (tests/test_sql_ast.py).
+sqlglot==30.30.0
+
 # Built-in modules used: sqlite3, os, re, typing
 
 # Optional Dependencies (for advanced extensions)

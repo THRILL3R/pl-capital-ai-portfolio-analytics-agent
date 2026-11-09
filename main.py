@@ -23,7 +23,7 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from portfolio_agent.database import PortfolioDatabase
-from portfolio_agent.agent import PortfolioAgent
+from portfolio_agent.agent import PortfolioAgent, _UNSET
 from portfolio_agent.tools import SQLQueryTool
 
 
@@ -47,6 +47,86 @@ def _format_pretty(response: dict) -> str:
     if result is None:
         if response.get("error"):
             lines.append(f"\n  Error: {response['error']}")
+        return "\n".join(lines)
+
+    # ── Conversational reply (greeting / thanks / goodbye) ──
+    if status == "conversation":
+        lines.append(f"\n  {result.get('message', '')}")
+        for detail in result.get("details", []):
+            lines.append(f"    * {detail}")
+        for example in result.get("suggested_questions", []):
+            lines.append(f"    - {example}")
+        return "\n".join(lines)
+
+    # ── Final-answer verification (consistency of this response with its structured tool results) ──
+    answer_check = result.get("answer_verification") if isinstance(result, dict) else None
+    if isinstance(answer_check, dict):
+        names = {
+            "verified": "VERIFIED (response is consistent with the tool results)",
+            "failed": "FAILED (inconsistency found; affected data withheld)",
+            "unverified": "UNVERIFIED (could not be fully verified)",
+            "not_applicable": "N/A (no analytical result presented)",
+        }
+        lines.append(f"  Answer verification: {names.get(answer_check.get('status'), answer_check.get('status'))}")
+        for mismatch in answer_check.get("mismatches", [])[:3]:
+            lines.append(f"    ! {mismatch.get('message')}")
+        if answer_check.get("unverified_claims"):
+            lines.append("    Note: model-written text is NOT verified: " + ", ".join(answer_check["unverified_claims"]))
+        if result.get("query_description"):
+            lines.append(f"  Description (model-generated, NOT verified): {result['query_description']}")
+
+    # ── Scenario / stress test (hypothetical) ──
+    if tool == "scenario_analysis":
+        scenario = result.get("scenario") or {}
+        lines.append(f"\n  Portfolio: {result.get('portfolio_name', 'N/A')}")
+        lines.append(f"  Scenario : {scenario.get('name', 'N/A')} (HYPOTHETICAL, not a forecast)")
+        v = (result.get("verification") or {}).get("status")
+        lines.append(f"  Verification: {str(v).upper() if v else 'n/a'}")
+        impacts = result.get("sector_impacts") or []
+        if impacts:
+            lines.append(_format_table(["Sector", "Exposure %", "Shock %", "Impact (pp)"], [
+                {"Sector": i["sector"], "Exposure %": f"{i['exposure_pct']:.2f}%", "Shock %": f"{i['shock_pct']:+.2f}%", "Impact (pp)": f"{i['contribution_pp']:+.4f}"} for i in impacts
+            ]))
+            lines.append(f"  Estimated portfolio impact: {result['estimated_portfolio_impact_pct']:+.4f} percentage points (hypothetical)")
+            value = result.get("estimated_value_impact")
+            if value:
+                lines.append(f"  Estimated value impact: {value['amount']:+,.2f} {value['currency']} (AUM {value['aum']:,.0f})")
+            cov = result.get("coverage") or {}
+            lines.append(f"  Coverage: equity {cov.get('equity_exposure_pct')}% | unmapped stock {cov.get('unmapped_equity_weight_pct')}% "
+                         f"| bonds excluded {cov.get('excluded_bond_weight_pct')}% | not renormalised")
+        elif result.get("error"):
+            lines.append(f"\n  Error: {result['error']}")
+        lines.append("\n  " + str(result.get("disclaimer", "")))
+        return "\n".join(lines)
+
+    # ── Hybrid analysis (SQL component + verified exposure component) ──
+    if tool == "hybrid_analysis":
+        portfolio = result.get("portfolio") or {}
+        lines.append(f"\n  Portfolio: {portfolio.get('portfolio_name', 'N/A')}")
+        lines.append(f"  Complete : {'yes' if result.get('complete') else 'NO - ' + str(result.get('status', '')).upper()}")
+        parts = result.get("components", {})
+        sql_part, exposure_part = parts.get("sql"), parts.get("exposure")
+        if sql_part is not None:
+            lines.append(f"\n  [SQL] status: {sql_part.get('status')} | question: {sql_part.get('question')}")
+            if sql_part.get("generated_sql"):
+                lines.append(f"  SQL: {sql_part['generated_sql']}")
+            if sql_part.get("rows") and sql_part.get("columns"):
+                lines.append(_format_table(sql_part["columns"], sql_part["rows"]))
+            elif sql_part.get("error"):
+                lines.append(f"  Error: {sql_part['error']}")
+        if exposure_part is not None:
+            v = (exposure_part.get("verification") or {}).get("status")
+            lines.append(f"\n  [Exposure] status: {exposure_part.get('status')} | verification: {str(v).upper() if v else 'n/a'}")
+            exposures = exposure_part.get("exposures") or []
+            if exposures:
+                lines.append(_format_table(["Sector", "Exposure %", "Holdings"], [
+                    {"Sector": e["sector"], "Exposure %": f"{e['exposure_pct']:.2f}%", "Holdings": str(e["holding_count"])} for e in exposures
+                ]))
+                lines.append(f"  Total equity weight: {exposure_part.get('total_equity_weight_pct', 0):.2f}% (bonds excluded, not renormalised)")
+            elif exposure_part.get("error"):
+                lines.append(f"  Error: {exposure_part['error']}")
+        if result.get("issues"):
+            lines.append("\n  Notice: this is NOT a complete result. " + " ".join(result["issues"]))
         return "\n".join(lines)
 
     # ── SQL Query Tool result ──
@@ -77,6 +157,14 @@ def _format_pretty(response: dict) -> str:
         lines.append(f"\n  Portfolio: {pname}")
         lines.append(f"  Basis   : {result.get('exposure_basis', 'N/A')}")
         lines.append(f"  Filter  : {result.get('asset_filter', 'N/A')}")
+        verification = result.get("verification")
+        if isinstance(verification, dict):
+            labels = {
+                "verified": "VERIFIED (independently recomputed from raw holdings; figures match)",
+                "failed": "FAILED (independent recomputation disagrees; figures withheld)",
+                "unverified": "UNVERIFIED (could not be checked; figures withheld)",
+            }
+            lines.append(f"  Verification: {labels.get(verification.get('status'), verification.get('status'))}")
 
         exposures = result.get("exposures", [])
         if exposures:
@@ -162,6 +250,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Disable Gemini LLM integration (use rule-based SQL generator only).",
     )
+    parser.add_argument(
+        "--no-intent-classifier",
+        action="store_true",
+        default=False,
+        help="Disable the local semantic intent classifier (legacy routing; for debugging).",
+    )
     return parser
 
 
@@ -234,16 +328,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     sql_tool = SQLQueryTool(db=db, use_gemini=not args.no_llm)
-    agent = PortfolioAgent(db=db, sql_tool=sql_tool)
+    agent = PortfolioAgent(db=db, sql_tool=sql_tool, intent_classifier=None if args.no_intent_classifier else _UNSET)
 
     if args.question:
         # One-shot mode
         response = agent.answer_question(args.question)
         _print_response(response, args.pretty)
         status = response.get("status", "error")
-        return 0 if status in ("success", "unsupported", "no_equity_holdings") else 1
+        return 0 if status in ("success", "unsupported", "no_equity_holdings", "conversation") else 1
     else:
-        # Interactive mode
+        # Interactive mode: load the local intent model up front so a missing model is reported immediately.
+        problem = agent.prepare_intent_classifier()
+        if problem:
+            print("Note: " + problem + chr(10), file=sys.stderr)
         run_interactive(agent, args.pretty)
         return 0
 

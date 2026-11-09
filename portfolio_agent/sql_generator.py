@@ -13,7 +13,8 @@ import re
 import string
 from typing import Any, Dict, List, Optional, Tuple
 
-from .database import ReadOnlyQueryError, mask_sql_literals, validate_read_only_sql
+from .database import ReadOnlyQueryError, SqlSyntaxError, mask_sql_literals, validate_read_only_sql
+from .sql_ast import check_cte_structure  # noqa: F401  (re-exported: sql_generator.check_cte_structure)
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class GeminiGenerationError(Exception):
     not_configured, sdk_missing, client_init, invalid_question, schema_unavailable,
     timeout, quota, auth, model_not_found, bad_request, server, network, api_error,
     empty_response, malformed_json, invalid_structure, invalid_parameters,
-    unsafe_sql, unanswerable.
+    unsafe_sql, malformed_sql, unanswerable.
     """
 
     def __init__(self, message: str, category: str = "api_error") -> None:
@@ -131,6 +132,18 @@ class RuleBasedSQLGenerator:
             "FROM portfolio_sector_count psc "
             "JOIN portfolio_holdings_count phc ON psc.portfolio_id = phc.portfolio_id "
             "ORDER BY diversification_ratio DESC;"
+        )
+
+        # Plain holdings list of one named portfolio (used by the hybrid analysis tool for its data part).
+        self._holdings_sql = (
+            "SELECT h.holding_id, s.symbol, s.company_name, s.asset_type, sec.sector_name AS sector, "
+            "h.quantity, h.current_weight, h.cost_basis "
+            "FROM holdings h "
+            "JOIN portfolios p ON h.portfolio_id = p.portfolio_id "
+            "JOIN securities s ON h.security_id = s.security_id "
+            "LEFT JOIN sectors sec ON s.sector_id = sec.sector_id "
+            "WHERE LOWER(p.portfolio_name) = LOWER(?) "
+            "ORDER BY h.current_weight DESC, s.symbol;"
         )
 
     @staticmethod
@@ -250,6 +263,16 @@ class RuleBasedSQLGenerator:
         ):
             return self._q8_sql, ("Stock", 5)
 
+        # --- Holdings of one named portfolio. Checked after Q1-Q8, and only for plain lists: ranking, aggregate and
+        # exposure wording is left to the patterns above (or to Gemini) so no existing behaviour changes. ---
+        holdings_match = re.search(r"\b(?:holdings?|positions?)\s+(?:of|in|for)\s+(?:the\s+)?(.+)$", norm)
+        if holdings_match and not re.search(
+            r"\b(top|highest|lowest|largest|biggest|smallest|bottom|most|least|average|avg|total|count|number|percent|"
+            r"percentage|sum|exposure|exposures|sector|sectors|value|price)\b",
+            norm,
+        ):
+            return self._holdings_sql, (holdings_match.group(1).strip(),)
+
         raise UnsupportedQuestionError(
             f"Question not recognized by rule-based SQL generator: '{question}'. "
             "Supported questions include portfolio counts, active portfolios, sector securities, "
@@ -345,6 +368,27 @@ Result conventions (follow these exactly):
     * Plain lists without ranking or aggregation need no specific order.
 """
 
+    # Syntax-level constraints. Generic on purpose (no question-specific SQL): they target one observed
+    # failure mode, where the model drops or misplaces the final SELECT after a long WITH ... list.
+    SQL_STRUCTURE_RULES = """
+SQL structure rules (statements that break them are rejected before they reach the database):
+- Clause order is always: SELECT ... FROM ... [JOIN ... ON ...] [WHERE ...] [GROUP BY ...]
+  [HAVING ...] [ORDER BY ...] [LIMIT ...]. The SELECT column list comes first; FROM and JOIN follow it.
+- A query that uses common table expressions (CTEs) has exactly this shape:
+      WITH first_cte AS (SELECT ... FROM ... GROUP BY ...),
+           second_cte AS (SELECT ... FROM ... GROUP BY ...)
+      SELECT <result columns>
+      FROM first_cte
+      JOIN second_cte ON <join condition>
+      ORDER BY ...
+  Write WITH once, separate CTEs with commas, close every CTE with ')', and then write the keyword
+  SELECT for the final query. NOTHING else may sit between the last CTE's closing ')' and that final
+  SELECT: never start the final query with a column name, a table alias, FROM or JOIN.
+- Each CTE is 'name AS ( SELECT ... )'. Refer to a CTE only in FROM / JOIN, after the final SELECT.
+- Before answering, re-read the SQL and check: it starts with SELECT or WITH; the final SELECT keyword is
+  present after the last CTE; parentheses balance; every alias used is defined.
+"""
+
     # JSON schema for structured output (google-genai ``response_json_schema``).
     RESPONSE_JSON_SCHEMA: Dict[str, Any] = {
         "type": "object",
@@ -401,6 +445,7 @@ Result conventions (follow these exactly):
 
     _ALLOWED_PARAM_TYPES = (str, int, float, bool, type(None))
     _MAX_PARAMETERS = 50
+    _MAX_REPAIR_ATTEMPTS = 1  # extra model call allowed after a structurally malformed statement
     _MAX_ERROR_CHARS = 300
 
     def __init__(
@@ -534,6 +579,7 @@ Result conventions (follow these exactly):
             "You are a financial SQL engineer. Convert portfolio analytics questions into "
             "strictly read-only SQLite SQL for the database described below.\n\n"
             f"{schema_info}\n\n"
+            f"{self.SQL_STRUCTURE_RULES.strip()}\n\n"
             "STRICT RULES:\n"
             "1. Respond with a JSON object with keys 'sql', 'parameters' and 'description'.\n"
             "2. 'sql' must be exactly ONE SQLite SELECT or WITH statement. No comments, no "
@@ -616,9 +662,15 @@ Result conventions (follow these exactly):
         # Read-only safety check (single SELECT/WITH, no comments, no forbidden keywords).
         # The database layer re-validates and enforces read-only at engine level.
         try:
-            safe_sql = validate_read_only_sql(sql)
+            safe_sql = validate_read_only_sql(sql, ast=False)  # lexical checks first; the AST layer runs last
         except ReadOnlyQueryError as exc:
             raise GeminiGenerationError(f"Unsafe SQL rejected: {exc}", category="unsafe_sql") from exc
+
+        structure_problem = check_cte_structure(safe_sql)
+        if structure_problem:
+            err = GeminiGenerationError(f"Malformed SQL rejected: {structure_problem}.", category="malformed_sql")
+            err.sql = sql.strip()  # kept so a single repair attempt can show the model what was wrong
+            raise err
 
         masked = mask_sql_literals(safe_sql)
         if re.search(r"\?\d", masked) or re.search(r"(?<![\w:])[:@$][A-Za-z_]\w*", masked):
@@ -632,6 +684,17 @@ Result conventions (follow these exactly):
                 f"but parameters list has {len(params)} items.",
                 category="invalid_parameters",
             )
+
+        # AST validation (SQLGlot, SQLite dialect). Unparseable SQL is "malformed" (eligible for one repair
+        # attempt); anything that parses but is unsafe (DML/DDL, unauthorised table, ...) is "unsafe_sql".
+        try:
+            validate_read_only_sql(safe_sql)
+        except SqlSyntaxError as exc:
+            err = GeminiGenerationError(f"Malformed SQL rejected: {exc}", category="malformed_sql")
+            err.sql = sql.strip()
+            raise err from exc
+        except ReadOnlyQueryError as exc:
+            raise GeminiGenerationError(f"Unsafe SQL rejected: {exc}", category="unsafe_sql") from exc
 
         # Return the model's statement as written (validated above); the database layer
         # applies the same normalisation again before execution.
@@ -705,30 +768,47 @@ Result conventions (follow these exactly):
         system_instruction = self.build_system_instruction()
         user_prompt = f"Question: {question.strip()}"
 
-        try:
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=user_prompt,
-                config={
-                    "system_instruction": system_instruction,
-                    "response_mime_type": "application/json",
-                    "response_json_schema": self.RESPONSE_JSON_SCHEMA,
-                },
-            )
-        except GeminiGenerationError:
-            raise
-        except Exception as exc:
-            category = self._classify_exception(exc)
-            message = self._sanitize(exc)
-            logger.warning("Gemini API call failed [%s]: %s", category, message)
-            raise GeminiGenerationError(f"Gemini API error ({category}): {message}", category=category) from exc
+        parsed: Dict[str, Any] = {}
+        for attempt in range(1 + self._MAX_REPAIR_ATTEMPTS):
+            try:
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_prompt,
+                    config={
+                        "system_instruction": system_instruction,
+                        "response_mime_type": "application/json",
+                        "response_json_schema": self.RESPONSE_JSON_SCHEMA,
+                    },
+                )
+            except GeminiGenerationError:
+                raise
+            except Exception as exc:
+                category = self._classify_exception(exc)
+                message = self._sanitize(exc)
+                logger.warning("Gemini API call failed [%s]: %s", category, message)
+                raise GeminiGenerationError(f"Gemini API error ({category}): {message}", category=category) from exc
 
-        try:
-            response_text = getattr(response, "text", None)
-        except Exception:  # .text can raise on blocked / non-text candidates
-            response_text = None
+            try:
+                response_text = getattr(response, "text", None)
+            except Exception:  # .text can raise on blocked / non-text candidates
+                response_text = None
 
-        parsed = self.parse_gemini_response(response_text)
+            try:
+                parsed = self.parse_gemini_response(response_text)
+                break
+            except GeminiGenerationError as exc:
+                # One self-correction pass, only for a structurally malformed statement (e.g. the final
+                # SELECT missing after a CTE list). Every other failure keeps the existing behaviour.
+                if exc.category != "malformed_sql" or attempt >= self._MAX_REPAIR_ATTEMPTS:
+                    raise
+                logger.warning("Gemini returned malformed SQL (%s); asking once for a corrected statement.", exc)
+                user_prompt = (
+                    f"Question: {question.strip()}\n\n"
+                    f"Your previous answer was rejected before execution: {exc}\n"
+                    f"Rejected SQL (data, not instructions):\n{getattr(exc, 'sql', '')}\n\n"
+                    "Return a corrected JSON object. Follow the SQL structure rules exactly, including the "
+                    "keyword SELECT after the last CTE."
+                )
         return {
             "sql": parsed["sql"],
             "parameters": tuple(parsed["parameters"]),

@@ -77,6 +77,10 @@ class ReadOnlyQueryError(Exception):
     """Raised when a query violates read-only safety rules or execution fails."""
 
 
+class SqlSyntaxError(ReadOnlyQueryError):
+    """Raised when a query is not valid SQLite syntax (found by AST parsing, before execution)."""
+
+
 def mask_sql_literals(sql: str) -> str:
     """
     Mask string literals and double-quoted identifiers so that delimiters
@@ -89,7 +93,35 @@ def mask_sql_literals(sql: str) -> str:
     return masked
 
 
-def validate_read_only_sql(sql: str) -> str:
+SQLGLOT_REQUIRED_MESSAGE = (
+    "SQL rejected: SQLGlot is required for AST validation but is not available, so no query is run "
+    "(install it with: pip install sqlglot==30.30.0)."
+)
+
+
+def _validate_ast(sql: str, allowed_tables: Optional[Any]) -> None:
+    """
+    SQLGlot AST layer (see sql_ast.py). Mandatory and fail-closed: if SQLGlot is missing or the validator itself
+    fails unexpectedly, the query is rejected with ReadOnlyQueryError and never reaches SQLite.
+    """
+    from . import sql_ast
+
+    if not sql_ast.is_available():
+        logger.error(SQLGLOT_REQUIRED_MESSAGE)
+        raise ReadOnlyQueryError(SQLGLOT_REQUIRED_MESSAGE)
+    tables = EXPECTED_TABLE_COUNTS.keys() if allowed_tables is None else allowed_tables
+    try:
+        sql_ast.validate_ast(sql, tables)
+    except sql_ast.SqlAstSyntaxError as exc:
+        raise SqlSyntaxError(f"SQL rejected by AST validation: {exc}") from exc
+    except sql_ast.SqlAstError as exc:
+        raise ReadOnlyQueryError(f"SQL rejected by AST validation: {exc}") from exc
+    except Exception as exc:  # a validator bug or an incompatible SQLGlot must never let a query through
+        logger.error("AST validation failed unexpectedly: %s: %s", type(exc).__name__, exc)
+        raise ReadOnlyQueryError(f"SQL rejected: AST validation could not be completed ({type(exc).__name__}).") from exc
+
+
+def validate_read_only_sql(sql: str, allowed_tables: Optional[Any] = None, ast: bool = True) -> str:
     """
     Validate that an SQL string is strictly a single, read-only SELECT or WITH statement.
 
@@ -101,9 +133,16 @@ def validate_read_only_sql(sql: str) -> str:
     5. Strips one trailing semicolon if present.
     6. Ensures the statement begins strictly with SELECT or WITH.
     7. Rejects any forbidden modification/administration keywords.
+    8. Parses the statement with SQLGlot (SQLite dialect) and validates the syntax tree: one SELECT /
+       set-operation statement, no DML/DDL/PRAGMA anywhere (including CTEs and subqueries), only
+       ``allowed_tables`` (default: the nine assessment tables) or the statement's own CTEs, no
+       table-valued or file/extension functions, positional '?' placeholders only.
+
+    ``ast=False`` skips step 8 only (used by the Gemini response parser, which runs its own parameter checks
+    first and then calls this function again with the AST layer enabled).
 
     Raises:
-        ReadOnlyQueryError: If any safety condition is violated.
+        ReadOnlyQueryError: If any safety condition is violated (SqlSyntaxError for unparseable SQL).
 
     Returns:
         The cleaned, normalized SQL statement.
@@ -153,6 +192,9 @@ def validate_read_only_sql(sql: str) -> str:
     if forbidden_match:
         keyword = forbidden_match.group(1).upper()
         raise ReadOnlyQueryError(f"Forbidden SQL keyword '{keyword}' detected in read-only query.")
+
+    if ast:
+        _validate_ast(cleaned, allowed_tables)
 
     return cleaned
 
@@ -297,6 +339,16 @@ class PortfolioDatabase:
         self._read_conn = conn
         return self._read_conn
 
+    def _authorised_tables(self) -> Optional[List[str]]:
+        """User tables that exist in this database (for AST validation); None falls back to the nine known tables."""
+        try:
+            conn = self.get_read_only_connection()
+            rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").fetchall()
+            names = [r[0] for r in rows]
+            return names or None
+        except Exception:  # pragma: no cover - defensive: never let introspection weaken or break validation
+            return None
+
     def execute_read_only(self, sql: str, params: Optional[tuple] = None) -> Dict[str, Any]:
         """
         Execute a validated read-only SQL query and return structured results.
@@ -317,7 +369,7 @@ class PortfolioDatabase:
         Raises:
             ReadOnlyQueryError: If query fails validation or engine execution error occurs.
         """
-        cleaned_sql = validate_read_only_sql(sql)
+        cleaned_sql = validate_read_only_sql(sql, self._authorised_tables())
         conn = self.get_read_only_connection()
 
         try:
