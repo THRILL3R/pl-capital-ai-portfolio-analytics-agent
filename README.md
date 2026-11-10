@@ -11,6 +11,10 @@ Built for the PL Capital (Prabhudas Lilladher Group) AI/ML Intern Round 2 techni
 The original assessment brief is preserved unchanged in
 [docs/ORIGINAL_ASSESSMENT_README.md](docs/ORIGINAL_ASSESSMENT_README.md).
 
+**Live demo:** <https://pl-capital-portfolio-analytics.vercel.app/> — the web interface on Vercel, over the supplied sample
+dataset. Gemini is disabled there, so SQL questions use the rule-based generator; the API has no authentication
+(see [Deploying on Vercel](#deploying-on-vercel-public-demo)).
+
 > **Results at a glance (verified locally, 2026-11-09)**
 >
 > | Area | Result |
