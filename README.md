@@ -28,8 +28,8 @@ The original assessment brief is preserved unchanged in
 > | Final-answer verification | Every analytical response checked for consistency with its tool results |
 > | Web interface | Responsive React + TypeScript app: Ask, Portfolios, Exposure, Evaluation, About |
 >
-> **Operating scope:** an assessment prototype that runs locally on a supplied sample dataset; its web API is
-> unauthenticated and local-only. See [Operating Scope](#operating-scope).
+> **Operating scope:** an assessment prototype over a supplied sample dataset. Its web API is unauthenticated: local-only
+> by default, with a restricted public demo on Vercel. See [Operating Scope](#operating-scope).
 
 ---
 
@@ -51,10 +51,11 @@ The original assessment brief is preserved unchanged in
 14. [Scenario analysis and stress testing](#scenario-analysis-and-stress-testing)
 15. [SQL generation: Gemini with deterministic fallback](#sql-generation-gemini-with-deterministic-fallback)
 16. [Web interface](#web-interface)
-17. [Running the tests](#running-the-tests)
-18. [Evaluation methodology and results](#evaluation-methodology-and-results)
-19. [Operating Scope](#operating-scope)
-20. [Further documentation](#further-documentation)
+17. [Deploying on Vercel (public demo)](#deploying-on-vercel-public-demo)
+18. [Running the tests](#running-the-tests)
+19. [Evaluation methodology and results](#evaluation-methodology-and-results)
+20. [Operating Scope](#operating-scope)
+21. [Further documentation](#further-documentation)
 
 ---
 
@@ -188,8 +189,9 @@ flowchart LR
   placeholders only. The API key is never printed or logged: error messages are redacted, the generator's `repr`
   hides it, the smoke test reports only `present` / `MISSING`, and the web layer never sends keys to the browser.
 - **Generated artefacts** (`database/*.db`, virtual environments, caches, logs) are git-ignored.
-- **Local-only web API.** The adapter binds to `127.0.0.1`, validates the `Host` header and enables no CORS
-  (see [Operating Scope](#operating-scope)).
+- **Local by default, restricted public demo.** Run locally, the adapter binds to `127.0.0.1`; in every mode it validates
+  the `Host` header and enables no CORS. The Vercel demo is public and unauthenticated, with Gemini disabled and no
+  secrets (see [Deploying on Vercel](#deploying-on-vercel-public-demo) and [Operating Scope](#operating-scope)).
 
 See [docs/GITHUB_READINESS.md](docs/GITHUB_READINESS.md) for the full security review and the pre-publication
 checklist.
@@ -204,7 +206,7 @@ checklist.
 | LLM | Google Gemini via the official `google-genai` SDK (tested with 3.0.0); model used for the final evaluation: `gemini-3.5-flash-lite` |
 | Local intent model | FastEmbed 0.9.1 + ONNX Runtime (`sentence-transformers/all-MiniLM-L6-v2`, CPU, no PyTorch) |
 | Configuration | `python-dotenv` (`.env` file) |
-| Web API | FastAPI + Uvicorn + Pydantic (loopback only) |
+| Web API | FastAPI + Uvicorn + Pydantic (loopback only locally; Vercel for the public demo) |
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS, Vitest |
 | Testing | `unittest` (Python), Vitest (frontend) |
 | Interface | Command line (`argparse`) and web |
@@ -216,6 +218,10 @@ Exercise_PL_AI_Engineer/
 ├── main.py                       # CLI agent (mandatory interface)
 ├── evaluate.py                   # Agent Evaluator
 ├── init_db.py                    # Database builder
+├── vercel.json                   # Vercel services: frontend + FastAPI adapter
+├── vercel_app.py                 # Vercel entry point for the FastAPI adapter
+├── pyproject.toml                # runtime-only dependencies for the Vercel deployment
+├── .vercelignore                 # files the Vercel CLI must never upload (.env, caches, database)
 ├── evaluation_report.md          # Default output path of evaluate.py (see docs/ for the committed evaluation reports)
 ├── portfolio_agent/
 │   ├── agent.py                  # PortfolioAgent (routing)
@@ -708,8 +714,8 @@ scope, the diversification definition). It contains no question IDs, official SQ
 A responsive React + Vite + TypeScript interface (Ask, Portfolios, Exposure, Evaluation, About) sits on top of the
 existing agent. It is additional: the CLI and evaluator work without it. The web layer is a thin local adapter
 (`portfolio_api/`, using FastAPI and Uvicorn from `requirements.txt`) that returns the agent's own responses. It
-binds to `127.0.0.1`, never sends API keys to the browser, and is intended for local use (see
-[Operating Scope](#operating-scope)). Full details: [frontend/README.md](frontend/README.md).
+binds to `127.0.0.1` when run locally and never sends API keys to the browser. A restricted public demo is described
+in [Deploying on Vercel](#deploying-on-vercel-public-demo) (see also [Operating Scope](#operating-scope)). Full details: [frontend/README.md](frontend/README.md).
 
 - **Ask:** a conversational interface with generated-SQL display, result tables, verification badges and
   hybrid and scenario answers.
@@ -723,6 +729,61 @@ cd frontend; npm install; npm run build; cd ..
 # run (serves the built UI and the API on http://127.0.0.1:8000)
 .\.venv\Scripts\python.exe -m portfolio_api            # add --no-llm for the rule-based generator only
 ```
+
+## Deploying on Vercel (public demo)
+
+The repository includes a Vercel configuration ([vercel.json](vercel.json)) that deploys the React frontend and the
+FastAPI adapter as one project with two services. A deployment of this repository runs at
+<https://pl-capital-portfolio-analytics.vercel.app>.
+
+| Service | Root | Serves |
+|---|---|---|
+| `frontend` | `frontend/` | The React app (Vite build) for every path except `/api/*`. Unknown paths fall back to `index.html`, so direct links such as `/evaluation` and `/portfolios` work. |
+| `app` | repository root | The FastAPI adapter (entry point `vercel_app:app`) for `/api/*`. |
+
+No service calls another (the browser calls `/api/*` directly), so no service bindings are used.
+
+**How the hosted demo differs from a local run**
+
+- **Gemini is disabled.** `PORTFOLIO_USE_LLM` is `0` and no Gemini API key is stored in Vercel. SQL questions are
+  answered by the deterministic rule-based generator, so only recognised question shapes work. The recorded live Gemini
+  results appear on the Evaluation page, but the hosted demo does not reproduce them.
+- **No local intent model.** The ~90 MB classifier model is not deployed, so routing uses the deterministic keyword rules.
+- **Database.** SQLite is built from the bundled CSV files and schema in the instance's temporary directory on a cold
+  start and queried through the same read-only controls as a local run. Nothing is persisted between instances and no
+  user data is stored.
+- **Evaluation page.** It reads the saved report files that ship with the repository.
+
+**Deploy it yourself** (PowerShell, from the repository root)
+
+```powershell
+npm install --global vercel                       # or run it with npx
+vercel login
+vercel project create <project-name>
+vercel env add PORTFOLIO_USE_LLM production       # enter 0 (also the default when unset)
+vercel deploy --dry --project <project-name>      # review the file list first (see the note on .vercelignore)
+vercel deploy --prod --project <project-name>
+```
+
+- **`.vercelignore` is required.** The Vercel CLI does not read `.gitignore` when it deploys a local folder; without
+  `.vercelignore` it would upload `.env`, `.model_cache/`, `database/portfolio.db`, `frontend/dist` and `submission/`.
+- **Dependencies.** The hosted API installs the runtime-only list in [pyproject.toml](pyproject.toml), not
+  `requirements.txt`; the Python version is pinned in `.python-version`.
+- **Optional variables.** `PORTFOLIO_ALLOWED_HOSTS` (comma-separated custom domains; the deployment's own Vercel
+  hostnames are allowed automatically) and `PORTFOLIO_DB_PATH`. `vercel git connect` redeploys on every push.
+
+**Public-demo security limitations** (see also [Operating Scope](#operating-scope))
+
+- **No authentication.** Anyone who can reach the production URL can call every endpoint (ask, exposure, scenario,
+  portfolio and evaluation data). The API sends no CORS headers, but that does not stop direct requests.
+- **No application-level rate limiting.** Only the limits of the Vercel platform and plan apply.
+- **Access model.** Under Vercel's default protection, deployment-specific and preview URLs redirect to a Vercel login,
+  while the production domain is public.
+- **No secrets are stored in the deployment.** The project holds no API key. Do not add `GEMINI_API_KEY` or set
+  `PORTFOLIO_USE_LLM=1` on a public deployment without first adding authentication and rate limiting, because anyone
+  could then spend that key's quota.
+- **Sample data only.** Do not point it at real portfolio data. The read-only SQL controls and `Host` header
+  validation remain in force, but they do not replace authentication.
 
 ## Running the tests
 
@@ -805,10 +866,12 @@ This project is an **assessment prototype** that runs locally over a supplied sa
 deployed enterprise investment platform, and it does not execute trades, give investment advice or make financial
 predictions.
 
-- **Local-only, unauthenticated API.** The web API (`portfolio_api`) has no authentication and is a single-user
-  prototype that binds to `127.0.0.1` and refuses other addresses. **Do not expose it to a network or the internet
-  as it is.** Public deployment would first need authentication, authorisation, TLS, rate limiting and a security
-  review.
+- **Unauthenticated API.** The web API (`portfolio_api`) has no authentication. Run locally, it is a single-user
+  prototype that binds to `127.0.0.1` and refuses other addresses. **Do not expose it to a network with real data or
+  credentials as it is.** The Vercel demo ([Deploying on Vercel](#deploying-on-vercel-public-demo)) is a deliberate,
+  restricted exception: public, read-only sample data, Gemini disabled, no secrets stored, and still no authentication
+  or application-level rate limiting. Any wider use would first need authentication, authorisation, rate limiting
+  and a security review.
 - **Sample data window.** Historical sample records (performance, risk, prices and transactions) cover
   **2023-09-25 to 2023-10-09**, and performance and risk records exist for 4 of the 13 portfolios. The agent does
   not provide comprehensive historical market data; period questions such as "last year" are answered from the

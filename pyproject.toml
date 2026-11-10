@@ -1,0 +1,15 @@
+# Runtime dependencies for the Vercel deployment only (see vercel.json and vercel_app.py).
+# Local development and the assessment keep using requirements.txt, which is unchanged. This file lists just
+# what the hosted API imports at runtime, because requirements.txt also carries optional, unused packages
+# (streamlit, pandas, scipy, matplotlib, seaborn, fastembed) that would bloat the serverless bundle.
+# There is deliberately no [build-system]: nothing here is built or published as a package.
+[project]
+name = "pl-capital-portfolio-analytics-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.104.0",
+    "pydantic>=2.5.0",
+    "sqlglot==30.30.0",       # mandatory SQL AST validation (pinned, as in requirements.txt)
+    "google-genai>=0.10.0",   # only imported when PORTFOLIO_USE_LLM=1 and GEMINI_API_KEY is set
+]

@@ -58,7 +58,8 @@ adds no business logic.
 Safeguards: loopback-only binding (a non-loopback `--host` is refused), `Host` header allow-list, input length
 limits, no CORS (single origin), no OpenAPI/docs routes, generic error messages, `Cache-Control: no-store` on
 API responses, serialised access to the shared SQLite connection. There is **no authentication**; this is a local
-single-user prototype. Do not expose it to a network.
+single-user prototype. Do not expose it to a network with real data or credentials. The restricted public demo on
+Vercel (Gemini disabled, no secrets, sample data only) is described in the root README.
 
 ## Project layout
 

@@ -1,0 +1,25 @@
+# Files that must never be uploaded to Vercel. The Vercel CLI does NOT read .gitignore when deploying from a
+# local folder, so everything sensitive or generated is listed here explicitly.
+
+# Secrets and local configuration
+.env
+.env.*
+
+# Local environments, caches and generated data (the database is rebuilt from data/ at runtime)
+.git
+.venv
+.model_cache
+.vercel
+database
+**/__pycache__
+*.pyc
+
+# Frontend: dependencies and build output are produced by Vercel's own build
+frontend/node_modules
+frontend/dist
+frontend/coverage
+
+# Not part of the deployed application
+submission
+tests
+scripts

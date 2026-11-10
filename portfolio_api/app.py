@@ -87,7 +87,9 @@ def create_app(
     *,
     static_dir: Optional[Path] = None,
     project_root: Optional[Path] = None,
+    allowed_hosts: Optional[List[str]] = None,
 ) -> FastAPI:
+    """Build the adapter. ``allowed_hosts`` defaults to loopback only; a hosted deployment passes its own hostnames."""
     svc = service or PortfolioService()
     root = Path(project_root) if project_root else PROJECT_ROOT
     dist = Path(static_dir) if static_dir is not None else DEFAULT_STATIC_DIR
@@ -96,7 +98,7 @@ def create_app(
         title="PL Capital Portfolio Analytics (local adapter)",
         docs_url=None, redoc_url=None, openapi_url=None,
     )
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts) if allowed_hosts is not None else ALLOWED_HOSTS)
 
     @app.middleware("http")
     async def _headers(request: Request, call_next):
