@@ -1,7 +1,8 @@
-import { Menu, X } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useHealth } from '../hooks/useHealth';
+import { useAuth } from './AccessGate';
 
 const NAV = [
   { to: '/ask', label: 'Ask' },
@@ -30,6 +31,7 @@ function DatasetChip() {
 
 export function Layout() {
   const [open, setOpen] = useState(false);
+  const { authRequired, logout } = useAuth();
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
 
@@ -80,6 +82,15 @@ export function Layout() {
 
           <div className="flex shrink-0 items-center gap-4">
             <DatasetChip />
+            {authRequired && (
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="hidden items-center gap-1.5 rounded-full border border-lavender-light px-3 py-1 text-label-md text-indigo-700 hover:bg-lavender-callout md:inline-flex"
+              >
+                <LogOut size={14} aria-hidden="true" /> Sign out
+              </button>
+            )}
             <Link to="/about#how-it-works" className="hidden text-label-md text-violet-accent hover:text-primary lg:inline">
               How it works
             </Link>
@@ -122,6 +133,15 @@ export function Layout() {
               </li>
             ))}
           </ul>
+          {authRequired && (
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="mt-6 inline-flex min-h-[48px] items-center gap-2 rounded-full border border-lavender-light px-5 text-label-lg text-indigo-700 hover:bg-lavender-callout"
+            >
+              <LogOut size={18} aria-hidden="true" /> Sign out
+            </button>
+          )}
         </div>
       )}
 

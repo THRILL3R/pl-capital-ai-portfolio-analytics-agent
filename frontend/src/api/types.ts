@@ -177,6 +177,12 @@ export interface Health {
   gemini_configured: boolean;
 }
 
+/** Reviewer access state (GET /api/auth/session). Nothing secret: whether a code is required and whether this browser has a session. */
+export interface SessionState {
+  auth_required: boolean;
+  authenticated: boolean;
+}
+
 export interface PortfolioSummary {
   portfolio_id: number;
   portfolio_name: string;

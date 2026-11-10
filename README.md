@@ -11,9 +11,7 @@ Built for the PL Capital (Prabhudas Lilladher Group) AI/ML Intern Round 2 techni
 The original assessment brief is preserved unchanged in
 [docs/ORIGINAL_ASSESSMENT_README.md](docs/ORIGINAL_ASSESSMENT_README.md).
 
-**Live demo:** <https://pl-capital-portfolio-analytics.vercel.app/> — the web interface on Vercel, over the supplied sample
-dataset. Gemini is disabled there, so SQL questions use the rule-based generator; the API has no authentication
-(see [Deploying on Vercel](#deploying-on-vercel-public-demo)).
+**Live demo:** [https://pl-capital-portfolio-analytics.vercel.app/](https://pl-capital-portfolio-analytics.vercel.app/) — the application is deployed on Vercel with reviewer access-code authentication and live Gemini integration (`gemini-3.5-flash-lite`). It runs on the supplied sample dataset and supports natural-language portfolio questions, validated read-only SQL, deterministic calculations, exposure analysis, and scenario analysis. Access requires a reviewer access code. See [Deploying on Vercel](https://github.com/THRILL3R/pl-capital-ai-portfolio-analytics-agent#deploying-on-vercel-reviewer-demo) for deployment and access configuration.
 
 > **Results at a glance (verified locally, 2026-11-09)**
 >
@@ -23,8 +21,8 @@ dataset. Gemini is disabled there, so SQL questions use the rule-based generator
 > | **Final live Gemini evaluation** (`gemini-3.5-flash-lite`, `evaluate.py --use-llm`) | **10 / 10** — [report](docs/EVALUATION_FINAL_LIVE_20261109.md) |
 > | Q1–Q8 (SQL questions) | **Gemini-generated SQL: 8 / 8 passed, zero rule-based fallbacks** |
 > | Q9–Q10 (sector exposure) | Deterministic `ExposureCalculator`: both passed |
-> | Python tests (`unittest`) | **535 passed, 0 failed, 0 skipped** |
-> | Frontend tests (Vitest) | **94 passed** |
+> | Python tests (`unittest`) | **596 passed, 0 failed, 0 skipped** |
+> | Frontend tests (Vitest) | **114 passed** |
 > | SQL safety | Lexical checks → **SQLGlot AST validation** → read-only SQLite (`mode=ro`, `query_only`, authorizer) |
 > | Financial verification | Exposure and scenario figures **recomputed independently** from raw rows before display |
 > | Hybrid analysis | One answer combining database rows with verified sector exposure |
@@ -32,8 +30,8 @@ dataset. Gemini is disabled there, so SQL questions use the rule-based generator
 > | Final-answer verification | Every analytical response checked for consistency with its tool results |
 > | Web interface | Responsive React + TypeScript app: Ask, Portfolios, Exposure, Evaluation, About |
 >
-> **Operating scope:** an assessment prototype over a supplied sample dataset. Its web API is unauthenticated: local-only
-> by default, with a restricted public demo on Vercel. See [Operating Scope](#operating-scope).
+> **Operating scope:** an assessment prototype over a supplied sample dataset. Run locally, its web API is unauthenticated
+> and loopback-only; the hosted demo on Vercel sits behind a shared reviewer access code. See [Operating Scope](#operating-scope).
 
 ---
 
@@ -55,7 +53,7 @@ dataset. Gemini is disabled there, so SQL questions use the rule-based generator
 14. [Scenario analysis and stress testing](#scenario-analysis-and-stress-testing)
 15. [SQL generation: Gemini with deterministic fallback](#sql-generation-gemini-with-deterministic-fallback)
 16. [Web interface](#web-interface)
-17. [Deploying on Vercel (public demo)](#deploying-on-vercel-public-demo)
+17. [Deploying on Vercel (reviewer demo)](#deploying-on-vercel-reviewer-demo)
 18. [Running the tests](#running-the-tests)
 19. [Evaluation methodology and results](#evaluation-methodology-and-results)
 20. [Operating Scope](#operating-scope)
@@ -179,7 +177,7 @@ flowchart LR
 | `portfolio_agent/scenario_verifier.py` | `ScenarioVerifier`: independent recomputation of every scenario result (exact fractions from raw rows, no shared code). |
 | `portfolio_agent/answer_verifier.py` | `AnswerVerifier`: checks that the final response is consistent with its structured tool results. No calculation, database or model access. |
 | `portfolio_agent/intent_classifier.py` | `LocalIntentClassifier`: local semantic intent detection (FastEmbed + ONNX, cached prototype embeddings, per-intent thresholds, margin and mixed-message guard). Prototypes in `intent_examples.py`. |
-| `portfolio_api/` | Local FastAPI adapter that wraps the agent for the web interface and returns the agent's own responses. |
+| `portfolio_api/` | FastAPI adapter that wraps the agent for the web interface and returns the agent's own responses; optional reviewer access control (`auth.py`) and request limits (`limits.py`). |
 | `scripts/gemini_smoke_test.py` | Manual **live** Gemini check (makes real API calls; not part of the test suite). |
 
 ### Security controls and API-key handling
@@ -189,13 +187,15 @@ flowchart LR
 - **Gemini is a generator, not an executor.** Its output is validated before execution and is never executed by
   the generator itself. The user question is treated as data in the prompt (prompt-injection guard), and any SQL
   it produces must still pass every read-only control.
-- **Secrets stay local.** Keys live only in `.env` (git-ignored) or environment variables; `.env.example` holds
-  placeholders only. The API key is never printed or logged: error messages are redacted, the generator's `repr`
+- **Secrets stay server-side.** Keys, the access code and the session secret live only in `.env` (git-ignored) or in the
+  hosting environment's variables; `.env.example` holds placeholders only. The API key is never printed or logged: error messages are redacted, the generator's `repr`
   hides it, the smoke test reports only `present` / `MISSING`, and the web layer never sends keys to the browser.
 - **Generated artefacts** (`database/*.db`, virtual environments, caches, logs) are git-ignored.
-- **Local by default, restricted public demo.** Run locally, the adapter binds to `127.0.0.1`; in every mode it validates
-  the `Host` header and enables no CORS. The Vercel demo is public and unauthenticated, with Gemini disabled and no
-  secrets (see [Deploying on Vercel](#deploying-on-vercel-public-demo) and [Operating Scope](#operating-scope)).
+- **Local by default; a shared reviewer access code when hosted.** Run locally, the adapter binds to `127.0.0.1`; in every
+  mode it validates the `Host` header and enables no CORS. When `REVIEWER_ACCESS_CODE` and `SESSION_SECRET` are set (mandatory
+  on Vercel) every data endpoint requires a signed `HttpOnly` session cookie, login attempts and requests are limited, and the
+  hosted entry point fails closed without that configuration and never enables Gemini behind an open API (see
+  [Deploying on Vercel](#deploying-on-vercel-reviewer-demo) and [Operating Scope](#operating-scope)).
 
 See [docs/GITHUB_READINESS.md](docs/GITHUB_READINESS.md) for the full security review and the pre-publication
 checklist.
@@ -240,14 +240,14 @@ Exercise_PL_AI_Engineer/
 │   ├── answer_verifier.py        # final-answer consistency checks
 │   ├── intent_classifier.py      # local semantic intent classifier
 │   └── intent_examples.py        # classifier prototypes
-├── portfolio_api/                # Local HTTP adapter for the web UI (FastAPI; wraps the agent unchanged)
+├── portfolio_api/                # HTTP adapter for the web UI (FastAPI; wraps the agent unchanged) + access control and limits
 ├── frontend/                     # React + Vite + TypeScript web interface (see frontend/README.md)
 ├── scripts/
 │   ├── gemini_smoke_test.py      # Manual live Gemini check
 │   ├── download_intent_model.py  # One-off local model download
 │   ├── calibrate_intents.py      # Intent-classifier calibration
 │   └── test_*.py                 # Optional live model benchmarks (make real API calls)
-├── tests/                        # 535 unit tests (no live API calls); tests/__init__.py makes the suite hermetic
+├── tests/                        # 596 unit tests (no live API calls); tests/__init__.py makes the suite hermetic
 ├── docs/
 │   ├── ORIGINAL_ASSESSMENT_README.md     # original brief, byte-identical
 │   ├── PROJECT_OVERVIEW.md               # technical overview
@@ -718,14 +718,16 @@ scope, the diversification definition). It contains no question IDs, official SQ
 A responsive React + Vite + TypeScript interface (Ask, Portfolios, Exposure, Evaluation, About) sits on top of the
 existing agent. It is additional: the CLI and evaluator work without it. The web layer is a thin local adapter
 (`portfolio_api/`, using FastAPI and Uvicorn from `requirements.txt`) that returns the agent's own responses. It
-binds to `127.0.0.1` when run locally and never sends API keys to the browser. A restricted public demo is described
-in [Deploying on Vercel](#deploying-on-vercel-public-demo) (see also [Operating Scope](#operating-scope)). Full details: [frontend/README.md](frontend/README.md).
+binds to `127.0.0.1` when run locally and never sends API keys to the browser. A hosted reviewer demo behind an access code is
+described in [Deploying on Vercel](#deploying-on-vercel-reviewer-demo) (see also [Operating Scope](#operating-scope)). Full details: [frontend/README.md](frontend/README.md).
 
 - **Ask:** a conversational interface with generated-SQL display, result tables, verification badges and
   hybrid and scenario answers.
 - **Portfolios and Exposure:** portfolio views, sector-exposure charts and tables, and a scenario workbench.
 - **Evaluation:** score tiles for the final live Gemini and deterministic evaluations, and a per-question matrix.
 - **About:** a short description of the system.
+- **Access screen (hosted demo):** a reviewer access-code screen and a Sign out button appear only when the server
+  requires a code; a plain local run is unchanged.
 
 ```powershell
 # one-time
@@ -734,11 +736,11 @@ cd frontend; npm install; npm run build; cd ..
 .\.venv\Scripts\python.exe -m portfolio_api            # add --no-llm for the rule-based generator only
 ```
 
-## Deploying on Vercel (public demo)
+## Deploying on Vercel (reviewer demo)
 
 The repository includes a Vercel configuration ([vercel.json](vercel.json)) that deploys the React frontend and the
-FastAPI adapter as one project with two services. A deployment of this repository runs at
-<https://pl-capital-portfolio-analytics.vercel.app>.
+FastAPI adapter as one project with two services. A deployment runs at <https://pl-capital-portfolio-analytics.vercel.app>.
+The page is reachable by URL, but the application and all of its data sit behind a **reviewer access code**.
 
 | Service | Root | Serves |
 |---|---|---|
@@ -747,24 +749,73 @@ FastAPI adapter as one project with two services. A deployment of this repositor
 
 No service calls another (the browser calls `/api/*` directly), so no service bindings are used.
 
-**How the hosted demo differs from a local run**
+### Reviewer access
 
-- **Gemini is disabled.** `PORTFOLIO_USE_LLM` is `0` and no Gemini API key is stored in Vercel. SQL questions are
-  answered by the deterministic rule-based generator, so only recognised question shapes work. The recorded live Gemini
-  results appear on the Evaluation page, but the hosted demo does not reproduce them.
+- **Access screen.** A reviewer opens the URL, enters the shared access code supplied with the submission, and the server
+  starts a signed session. The code is checked on the server in constant time against `REVIEWER_ACCESS_CODE`. It is never
+  stored in the browser (nothing in `localStorage` or `sessionStorage`), never part of the JavaScript bundle and never
+  returned by any endpoint.
+- **Session.** An HMAC-signed token in a `pl_session` cookie: `HttpOnly`, `SameSite=Strict`, `Secure` on HTTPS, `Path=/`,
+  2-hour lifetime by default. It is signed with `SESSION_SECRET`, a separate secret that is never the access code or the
+  Gemini key. Rotating the access code or the secret ends every existing session.
+- **The API itself is protected, not just the page.** `/api/ask`, `/api/exposure`, `/api/scenario`, `/api/scenarios`,
+  `/api/portfolios`, `/api/portfolios/{id}` and `/api/evaluation` answer `401` without a valid session, including to
+  direct requests. Only `/api/auth/login`, `/api/auth/logout`, `/api/auth/session` and a minimal `/api/health`
+  (`{"status": "ok"}` until signed in) are public. State-changing requests that a browser marks as cross-site are refused.
+- **Sign out** clears the cookie and records the session as revoked.
+- **Fails closed.** If `REVIEWER_ACCESS_CODE` or `SESSION_SECRET` is missing, too short (code at least 12 characters, secret
+  at least 32), identical to each other or reused as the Gemini key, the hosted API refuses every data request with `503`,
+  and Gemini stays off even if it is switched on.
+
+### Environment variables
+
+Names only: values are set in the Vercel project (use the dashboard and mark them Sensitive) and never in the repository.
+
+| Variable | Needed | Purpose |
+|---|---|---|
+| `REVIEWER_ACCESS_CODE` | yes | The shared code reviewers type (at least 12 characters; random is best). |
+| `SESSION_SECRET` | yes | Signing secret for session cookies (at least 32 random characters; used for nothing else). |
+| `GEMINI_API_KEY` | for Gemini | Read only by the backend; never `VITE_`-prefixed, never logged and never returned. |
+| `PORTFOLIO_USE_LLM` | for Gemini | `1` enables Gemini. Ignored unless access control is active. |
+| `GEMINI_MODEL` | optional | Model name; the final evaluation used `gemini-3.5-flash-lite` (the code default is `gemini-3.8-flash`). |
+| `PORTFOLIO_SESSION_TTL_SECONDS` | optional | Session lifetime, 300 to 86400 (default 7200). |
+| `PORTFOLIO_LOGIN_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_GLOBAL_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_WINDOW_SECONDS` | optional | Login throttling (defaults: 5 per client and 60 in total per 600 s). |
+| `PORTFOLIO_ASK_PER_MINUTE`, `PORTFOLIO_API_PER_MINUTE`, `PORTFOLIO_ASK_PER_DAY` | optional | Per-session request limits (defaults: 15 and 120 per minute; the daily cap is off). |
+| `PORTFOLIO_ALLOWED_HOSTS`, `PORTFOLIO_DB_PATH` | optional | Custom domains (comma-separated) and the database location. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | optional | A shared store for limits and sign-out (see below). |
+
+To make a random value without typing or printing it, run this in PowerShell and paste from the clipboard into the Vercel
+dashboard: `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); Set-Clipboard (($b | ForEach-Object { $_.ToString('x2') }) -join '')`.
+
+### What the limits do and do not guarantee
+
+Vercel runs several short-lived instances, so a counter held in memory is **per instance**: it slows guessing and bursts, but
+it is not a deployment-wide guarantee. A shared limit and a sign-out that holds on every instance need a shared store. The
+code supports an Upstash Redis database through its REST API and uses it only when both `UPSTASH_REDIS_REST_*` variables are
+set (it is a separate account and service that this project does not require, and nothing here enables it). If the store is
+unreachable, requests fall back to the per-instance counters and a warning is logged. The strength of the access code is the
+main defence against guessing, and every attempt, failed or not, is also bounded by Vercel's own platform limits.
+
+### How the hosted demo differs from a local run
+
+- **Gemini.** With `PORTFOLIO_USE_LLM=1` and `GEMINI_API_KEY` set, free-form SQL questions are generated by Gemini on the
+  server. Its output goes through the same lexical, SQLGlot AST and read-only controls as locally; unsafe or invalid SQL is
+  rejected, and if Gemini fails, times out or is rejected, the deterministic generator answers and the response says which
+  method produced it. Without the key (or without access control) the deterministic generator answers everything.
 - **No local intent model.** The ~90 MB classifier model is not deployed, so routing uses the deterministic keyword rules.
 - **Database.** SQLite is built from the bundled CSV files and schema in the instance's temporary directory on a cold
   start and queried through the same read-only controls as a local run. Nothing is persisted between instances and no
   user data is stored.
 - **Evaluation page.** It reads the final live and deterministic report files that ship with the deployment.
 
-**Deploy it yourself** (PowerShell, from the repository root)
+### Deploy it yourself
 
 ```powershell
 npm install --global vercel                       # or run it with npx
 vercel login
 vercel project create <project-name>
-vercel env add PORTFOLIO_USE_LLM production       # enter 0 (also the default when unset)
+# In the Vercel dashboard (Project > Settings > Environment Variables) add, for Production:
+#   REVIEWER_ACCESS_CODE, SESSION_SECRET, GEMINI_API_KEY (mark all three Sensitive), PORTFOLIO_USE_LLM=1, GEMINI_MODEL
 vercel deploy --dry --project <project-name>      # review the file list first (see the note on .vercelignore)
 vercel deploy --prod --project <project-name>
 ```
@@ -773,21 +824,19 @@ vercel deploy --prod --project <project-name>
   `.vercelignore` it would upload `.env`, `.model_cache/`, `database/portfolio.db`, `frontend/dist` and `submission/`.
 - **Dependencies.** The hosted API installs the runtime-only list in [pyproject.toml](pyproject.toml), not
   `requirements.txt`; the Python version is pinned in `.python-version`.
-- **Optional variables.** `PORTFOLIO_ALLOWED_HOSTS` (comma-separated custom domains; the deployment's own Vercel
-  hostnames are allowed automatically) and `PORTFOLIO_DB_PATH`. `vercel git connect` redeploys on every push.
+- **Redeploying.** Environment variable changes apply only to new deployments. `vercel git connect` redeploys on every push.
 
-**Public-demo security limitations** (see also [Operating Scope](#operating-scope))
+### Limitations of the hosted demo
 
-- **No authentication.** Anyone who can reach the production URL can call every endpoint (ask, exposure, scenario,
-  portfolio and evaluation data). The API sends no CORS headers, but that does not stop direct requests.
-- **No application-level rate limiting.** Only the limits of the Vercel platform and plan apply.
-- **Access model.** Under Vercel's default protection, deployment-specific and preview URLs redirect to a Vercel login,
-  while the production domain is public.
-- **No secrets are stored in the deployment.** The project holds no API key. Do not add `GEMINI_API_KEY` or set
-  `PORTFOLIO_USE_LLM=1` on a public deployment without first adding authentication and rate limiting, because anyone
-  could then spend that key's quota.
-- **Sample data only.** Do not point it at real portfolio data. The read-only SQL controls and `Host` header
-  validation remain in force, but they do not replace authentication.
+- **One shared code.** It controls who can use the demo; it does not identify individuals, and anyone who has the code has
+  full access. Rotate it (change the variable and redeploy) to cut off everyone.
+- **Stateless sessions.** A copied session cookie stays valid until it expires unless the shared store is configured; sign-out
+  then holds on every instance, otherwise only on the instance that handled it.
+- **Per-instance limits** unless the shared store is configured (above).
+- **The page is public; the data is not.** The static frontend bundle is served to anyone and contains no secrets or data.
+  Under Vercel's default protection, deployment-specific and preview URLs additionally redirect to a Vercel login.
+- **Sample data only.** Do not point it at real portfolio data. This is an assessment prototype, not a security-reviewed
+  production service.
 
 ## Running the tests
 
@@ -815,10 +864,11 @@ python -B -m unittest discover -s tests -t .
 | `test_answer_verifier.py` | 63 | final-answer verification: SQL / exposure / hybrid / scenario consistency, failed and unverified handling, identity and status checks, model-text labelling, exceptions, no calculation / database / second Gemini call, API and CLI |
 | `test_scenario.py` | 65 | scenario / stress testing: calculations (broad, severe, sector, positive, zero, multiple), coverage cases (partial, unmapped, bonds, no renormalisation, empty), validation (NaN, infinity, boundaries), independent verification, withholding, agent routing, CLI, API |
 | `test_routing_precedence.py` | 14 | historical / descriptive risk questions reach the SQL tool whatever the classifier suggests (classifier enabled and disabled); exposure, hybrid, scenario, SQL and official Q1-Q10 routes unchanged |
-| **Total** | **535** | |
+| `test_auth.py` | 61 | reviewer access: code and signed-session checks (tampered, expired, rotated), every data endpoint blocked without a session, cookie flags, logout and revocation, cross-site refusal, login and request limits, the shared-store client (mocked), mocked-Gemini path, fallback on failure, unsafe generated SQL rejected, no secret in any response or log, and the Vercel entry point failing closed |
+| **Total** | **596** | |
 
-**Python: 535 passed, 0 failed, 0 skipped** (project virtual environment with all of `requirements.txt`
-installed). The web frontend has its own suite (`cd frontend && npm test`): **94 Vitest tests passed**, plus
+**Python: 596 passed, 0 failed, 0 skipped** (project virtual environment with all of `requirements.txt`
+installed). The web frontend has its own suite (`cd frontend && npm test`): **114 Vitest tests passed**, plus
 `npx tsc --noEmit` and `npm run build`.
 
 The suite is **hermetic**: `tests/__init__.py` removes `GEMINI_API_KEY` from the test process and stops `main.py`
@@ -870,12 +920,13 @@ This project is an **assessment prototype** that runs locally over a supplied sa
 deployed enterprise investment platform, and it does not execute trades, give investment advice or make financial
 predictions.
 
-- **Unauthenticated API.** The web API (`portfolio_api`) has no authentication. Run locally, it is a single-user
-  prototype that binds to `127.0.0.1` and refuses other addresses. **Do not expose it to a network with real data or
-  credentials as it is.** The Vercel demo ([Deploying on Vercel](#deploying-on-vercel-public-demo)) is a deliberate,
-  restricted exception: public, read-only sample data, Gemini disabled, no secrets stored, and still no authentication
-  or application-level rate limiting. Any wider use would first need authentication, authorisation, rate limiting
-  and a security review.
+- **Access control.** Run locally, the web API (`portfolio_api`) has no authentication: it is a single-user prototype that
+  binds to `127.0.0.1` and refuses other addresses. **Do not expose it to a network with real data or credentials as it
+  is.** The Vercel demo ([Deploying on Vercel](#deploying-on-vercel-reviewer-demo)) is a deliberate, restricted exception:
+  read-only sample data behind one shared reviewer access code, signed `HttpOnly` sessions, login and request limits
+  (per instance unless an optional shared store is configured), no secret in the repository or the browser, and Gemini
+  only server-side. It does not identify individual users. Any wider use would first need per-user authentication and
+  authorisation, shared rate limiting and a security review.
 - **Sample data window.** Historical sample records (performance, risk, prices and transactions) cover
   **2023-09-25 to 2023-10-09**, and performance and risk records exist for 4 of the 13 portfolios. The agent does
   not provide comprehensive historical market data; period questions such as "last year" are answered from the
