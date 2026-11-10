@@ -120,12 +120,22 @@ class PortfolioService:
             raise QuestionValidationError(f"Value is too long (maximum {limit} characters).")
         return cleaned
 
-    def ask(self, question: str) -> Dict[str, Any]:
-        """Run the existing PortfolioAgent. The response contract is returned verbatim."""
+    def ask(self, question: str, allow_gemini: bool = True) -> Dict[str, Any]:
+        """Run the existing PortfolioAgent. The response contract is returned verbatim.
+
+        ``allow_gemini=False`` answers this one question with the deterministic generator only (used when a hosted demo's
+        Gemini budget is spent, so the demo keeps working instead of refusing visitors).
+        """
         question = self._clean(question, MAX_QUESTION_CHARS)
         try:
             with self._lock:
-                return self.agent.answer_question(question)
+                previous = self.sql_tool.use_gemini
+                if not allow_gemini:
+                    self.sql_tool.use_gemini = False
+                try:
+                    return self.agent.answer_question(question)
+                finally:
+                    self.sql_tool.use_gemini = previous
         except Exception:  # defensive: the agent normally returns status='error' itself
             logger.exception("PortfolioAgent raised unexpectedly")
             return {

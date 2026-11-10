@@ -81,7 +81,7 @@ ground_truth_dataset.json     (official, unchanged)
 data/*.csv                    (9 official datasets, unchanged)
 portfolio_agent/*.py
 scripts/gemini_smoke_test.py
-tests/*.py                    (596 tests, incl. test_prompt_conventions.py, test_api.py, test_auth.py, test_conversation.py and test_intent_classifier.py)
+tests/*.py                    (612 tests, incl. test_prompt_conventions.py, test_api.py, test_auth.py, test_conversation.py and test_intent_classifier.py)
 docs/ORIGINAL_ASSESSMENT_README.md
 docs/PROJECT_OVERVIEW.md
 docs/GITHUB_READINESS.md
@@ -123,7 +123,7 @@ publish (e.g. `evaluation_report_subset.md` from a targeted run).
    historical records. **After rotating the key**, re-run the smoke test or a live evaluation to confirm the
    new key works. Update the README only with results that were actually obtained.
 5. Run the final checks:
-   `python -B -m unittest discover -s tests -t .` (expect 596 OK: 0 failures and 0 skipped in the project venv with all requirements installed) and
+   `python -B -m unittest discover -s tests -t .` (expect 612 OK: 0 failures and 0 skipped in the project venv with all requirements installed) and
    `.\.venv\Scripts\python.exe evaluate.py --report docs\EVALUATION_DETERMINISTIC.md` (expect 10/10,
    deterministic). Use `--report` so the deterministic run does not overwrite the live
    `evaluation_report.md`.
@@ -139,7 +139,7 @@ publish (e.g. `evaluation_report_subset.md` from a targeted run).
 - [x] Secret-safe scan finds credentials only in `.env` (2026-11-09; plus the intentional `FAKE_KEY` test fixture)
 - [ ] `git check-ignore` confirms `.env`, `.venv/`, `database/*.db` are ignored
 - [ ] `git add --dry-run .` lists only the files in §4
-- [ ] 596 unit tests pass (project venv); deterministic evaluator reports 10/10
+- [ ] 612 unit tests pass (project venv); deterministic evaluator reports 10/10
 - [ ] README distinguishes the deterministic 10/10, the final live 10/10 (`docs/EVALUATION_FINAL_LIVE_20261109.md`) and the historical 9/10 run
 - [ ] README Gemini status matches the latest real live results
 - [ ] No claims of live Gemini verification beyond what was actually run

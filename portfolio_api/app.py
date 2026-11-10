@@ -105,10 +105,13 @@ def create_app(
     auth: Optional[AuthManager] = None,
     store: Any = None,
     limits: Optional[RequestLimits] = None,
+    public_limits: bool = False,
 ) -> FastAPI:
     """Build the adapter. ``allowed_hosts`` defaults to loopback only; a hosted deployment passes its own hostnames.
 
     ``auth`` defaults to access control read from the environment (off when REVIEWER_ACCESS_CODE and SESSION_SECRET are unset).
+    ``public_limits`` is for a deliberately open hosted demo (no access code): requests are then limited per visitor address
+    and ``limits.ask_per_day`` becomes a Gemini budget that, once spent, switches questions to the deterministic generator.
     """
     svc = service or PortfolioService()
     store = store if store is not None else store_from_env(os.environ)
@@ -155,10 +158,14 @@ def create_app(
         return auth.authorize(request)
 
     def session_limited(scope: str, per_minute: int):
-        def dependency(session: Optional[Dict[str, Any]] = Depends(protected)) -> None:
-            if auth.mode != ENABLED or session is None:
+        def dependency(request: Request, session: Optional[Dict[str, Any]] = Depends(protected)) -> None:
+            if auth.mode == ENABLED and session is not None:
+                key = f"{scope}:{session['sid']}"
+            elif public_limits and auth.mode == DISABLED:
+                key = f"{scope}:client:{client_key(request)}"   # open demo: one budget per visitor address
+            else:
                 return  # access control off (local use): behaviour unchanged
-            decision = store.hit(f"{scope}:{session['sid']}", per_minute, 60)
+            decision = store.hit(key, per_minute, 60)
             if not decision.allowed:
                 raise too_many(decision.retry_after)
         return dependency
@@ -217,6 +224,12 @@ def create_app(
 
     @app.post("/api/ask", dependencies=[Depends(ask_limited)])
     def ask(body: AskRequest) -> Dict[str, Any]:
+        if public_limits and auth.mode == DISABLED and limits.ask_per_day:
+            # Open demo: the daily Gemini budget degrades gracefully. Once spent, questions are still answered, by the
+            # deterministic generator, so a burst of traffic can never lock reviewers out.
+            budget = store.hit("ask:day:" + time.strftime("%Y%m%d", time.gmtime()), limits.ask_per_day, 86400)
+            if not budget.allowed:
+                return svc.ask(body.question, allow_gemini=False)
         return svc.ask(body.question)
 
     @app.post("/api/exposure", dependencies=[Depends(api_limited)])
@@ -265,4 +278,5 @@ def create_app(
 
     app.state.service = svc
     app.state.auth = auth
+    app.state.limits = limits
     return app

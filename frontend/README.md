@@ -53,7 +53,7 @@ adds no business logic.
 | `POST /api/exposure` `{portfolio_name}` | Runs `ExposureCalculator.calculate`; result returned as is. |
 | `GET /api/portfolios`, `GET /api/portfolios/{id}` | Portfolio list; holdings, performance and risk records. Fixed, parameterised, read-only queries. |
 | `GET /api/evaluation` | Parses `docs/EVALUATION_FINAL_LIVE_20261109.md` (the preferred, final live run) and `docs/EVALUATION_DETERMINISTIC.md`, and merges the ground-truth question text. Older run reports, when present, are returned separately but the Evaluation page does not display them. Each report is classified by the mode recorded inside it, so a deterministic run can never appear as live evidence. |
-| `GET /api/auth/session`, `POST /api/auth/login`, `POST /api/auth/logout` | Reviewer access (hosted demo): whether a code is required and whether this browser has a session; signs in with the shared code (sets an HttpOnly cookie); signs out. Every data endpoint above then answers 401 without a session. When no code is configured (a plain local run) nothing is required. |
+| `GET /api/auth/session`, `POST /api/auth/login`, `POST /api/auth/logout` | Optional reviewer access (access-code mode): whether a code is required and whether this browser has a session; signs in with the shared code (sets an HttpOnly cookie); signs out. Every data endpoint above then answers 401 without a session. When no code is configured (a plain local run, or the open hosted demo) nothing is required. |
 | `GET /api/health` | Booleans and a dataset row count (a minimal `{"status": "ok"}` until signed in when a code is required). |
 
 Safeguards: loopback-only binding (a non-loopback `--host` is refused), `Host` header allow-list, input length

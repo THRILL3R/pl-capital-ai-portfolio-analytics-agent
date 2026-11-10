@@ -11,7 +11,7 @@ Built for the PL Capital (Prabhudas Lilladher Group) AI/ML Intern Round 2 techni
 The original assessment brief is preserved unchanged in
 [docs/ORIGINAL_ASSESSMENT_README.md](docs/ORIGINAL_ASSESSMENT_README.md).
 
-**Live demo:** [https://pl-capital-portfolio-analytics.vercel.app/](https://pl-capital-portfolio-analytics.vercel.app/) — the application is deployed on Vercel with reviewer access-code authentication and live Gemini integration (`gemini-3.5-flash-lite`). It runs on the supplied sample dataset and supports natural-language portfolio questions, validated read-only SQL, deterministic calculations, exposure analysis, and scenario analysis. Access requires a reviewer access code. See [Deploying on Vercel](https://github.com/THRILL3R/pl-capital-ai-portfolio-analytics-agent#deploying-on-vercel-reviewer-demo) for deployment and access configuration.
+**Live demo:** [https://pl-capital-portfolio-analytics.vercel.app/](https://pl-capital-portfolio-analytics.vercel.app/) — no reviewer login or access code is required. The application is deployed on Vercel with live Gemini integration (`gemini-3.5-flash-lite`) over the supplied sample dataset, and supports natural-language portfolio questions, validated read-only SQL, deterministic exposure analysis and scenario analysis. Gemini requests are rate-limited per visitor, with a per-instance daily budget and a deterministic fallback. See [Deploying on Vercel](https://github.com/THRILL3R/pl-capital-ai-portfolio-analytics-agent#deploying-on-vercel-reviewer-demo) for how the demo is configured and its limits.
 
 > **Results at a glance (verified locally, 2026-11-09)**
 >
@@ -21,7 +21,7 @@ The original assessment brief is preserved unchanged in
 > | **Final live Gemini evaluation** (`gemini-3.5-flash-lite`, `evaluate.py --use-llm`) | **10 / 10** — [report](docs/EVALUATION_FINAL_LIVE_20261109.md) |
 > | Q1–Q8 (SQL questions) | **Gemini-generated SQL: 8 / 8 passed, zero rule-based fallbacks** |
 > | Q9–Q10 (sector exposure) | Deterministic `ExposureCalculator`: both passed |
-> | Python tests (`unittest`) | **596 passed, 0 failed, 0 skipped** |
+> | Python tests (`unittest`) | **612 passed, 0 failed, 0 skipped** |
 > | Frontend tests (Vitest) | **114 passed** |
 > | SQL safety | Lexical checks → **SQLGlot AST validation** → read-only SQLite (`mode=ro`, `query_only`, authorizer) |
 > | Financial verification | Exposure and scenario figures **recomputed independently** from raw rows before display |
@@ -31,7 +31,8 @@ The original assessment brief is preserved unchanged in
 > | Web interface | Responsive React + TypeScript app: Ask, Portfolios, Exposure, Evaluation, About |
 >
 > **Operating scope:** an assessment prototype over a supplied sample dataset. Run locally, its web API is unauthenticated
-> and loopback-only; the hosted demo on Vercel sits behind a shared reviewer access code. See [Operating Scope](#operating-scope).
+> and loopback-only; the hosted demo on Vercel is open (no login), with per-visitor limits and a guarded Gemini budget. See
+> [Operating Scope](#operating-scope).
 
 ---
 
@@ -191,10 +192,11 @@ flowchart LR
   hosting environment's variables; `.env.example` holds placeholders only. The API key is never printed or logged: error messages are redacted, the generator's `repr`
   hides it, the smoke test reports only `present` / `MISSING`, and the web layer never sends keys to the browser.
 - **Generated artefacts** (`database/*.db`, virtual environments, caches, logs) are git-ignored.
-- **Local by default; a shared reviewer access code when hosted.** Run locally, the adapter binds to `127.0.0.1`; in every
-  mode it validates the `Host` header and enables no CORS. When `REVIEWER_ACCESS_CODE` and `SESSION_SECRET` are set (mandatory
-  on Vercel) every data endpoint requires a signed `HttpOnly` session cookie, login attempts and requests are limited, and the
-  hosted entry point fails closed without that configuration and never enables Gemini behind an open API (see
+- **Local by default; open with guard rails or behind an access code when hosted.** Run locally, the adapter binds to
+  `127.0.0.1`; in every mode it validates the `Host` header and enables no CORS. The hosted entry point is either gated (a signed
+  `HttpOnly` session cookie required by every data endpoint, failing closed when misconfigured) or explicitly opened with
+  `PORTFOLIO_OPEN_ACCESS=1`, in which case every visitor address is rate-limited and Gemini has a per-instance daily budget that
+  degrades to the deterministic generator. Gemini is never enabled unless one of the two is in place (see
   [Deploying on Vercel](#deploying-on-vercel-reviewer-demo) and [Operating Scope](#operating-scope)).
 
 See [docs/GITHUB_READINESS.md](docs/GITHUB_READINESS.md) for the full security review and the pre-publication
@@ -247,7 +249,7 @@ Exercise_PL_AI_Engineer/
 │   ├── download_intent_model.py  # One-off local model download
 │   ├── calibrate_intents.py      # Intent-classifier calibration
 │   └── test_*.py                 # Optional live model benchmarks (make real API calls)
-├── tests/                        # 596 unit tests (no live API calls); tests/__init__.py makes the suite hermetic
+├── tests/                        # 612 unit tests (no live API calls); tests/__init__.py makes the suite hermetic
 ├── docs/
 │   ├── ORIGINAL_ASSESSMENT_README.md     # original brief, byte-identical
 │   ├── PROJECT_OVERVIEW.md               # technical overview
@@ -726,8 +728,8 @@ described in [Deploying on Vercel](#deploying-on-vercel-reviewer-demo) (see also
 - **Portfolios and Exposure:** portfolio views, sector-exposure charts and tables, and a scenario workbench.
 - **Evaluation:** score tiles for the final live Gemini and deterministic evaluations, and a per-question matrix.
 - **About:** a short description of the system.
-- **Access screen (hosted demo):** a reviewer access-code screen and a Sign out button appear only when the server
-  requires a code; a plain local run is unchanged.
+- **Access screen (access-code mode only):** a reviewer access-code screen and a Sign out button appear only when the server
+  requires a code; the open hosted demo and a plain local run show neither.
 
 ```powershell
 # one-time
@@ -740,7 +742,7 @@ cd frontend; npm install; npm run build; cd ..
 
 The repository includes a Vercel configuration ([vercel.json](vercel.json)) that deploys the React frontend and the
 FastAPI adapter as one project with two services. A deployment runs at <https://pl-capital-portfolio-analytics.vercel.app>.
-The page is reachable by URL, but the application and all of its data sit behind a **reviewer access code**.
+It is **open**: reviewers go straight into the application, with no login and no access code.
 
 | Service | Root | Serves |
 |---|---|---|
@@ -749,59 +751,60 @@ The page is reachable by URL, but the application and all of its data sit behind
 
 No service calls another (the browser calls `/api/*` directly), so no service bindings are used.
 
-### Reviewer access
+### Access modes
 
-- **Access screen.** A reviewer opens the URL, enters the shared access code supplied with the submission, and the server
-  starts a signed session. The code is checked on the server in constant time against `REVIEWER_ACCESS_CODE`. It is never
-  stored in the browser (nothing in `localStorage` or `sessionStorage`), never part of the JavaScript bundle and never
-  returned by any endpoint.
-- **Session.** An HMAC-signed token in a `pl_session` cookie: `HttpOnly`, `SameSite=Strict`, `Secure` on HTTPS, `Path=/`,
-  2-hour lifetime by default. It is signed with `SESSION_SECRET`, a separate secret that is never the access code or the
-  Gemini key. Rotating the access code or the secret ends every existing session.
-- **The API itself is protected, not just the page.** `/api/ask`, `/api/exposure`, `/api/scenario`, `/api/scenarios`,
-  `/api/portfolios`, `/api/portfolios/{id}` and `/api/evaluation` answer `401` without a valid session, including to
-  direct requests. Only `/api/auth/login`, `/api/auth/logout`, `/api/auth/session` and a minimal `/api/health`
-  (`{"status": "ok"}` until signed in) are public. State-changing requests that a browser marks as cross-site are refused.
-- **Sign out** clears the cookie and records the session as revoked.
-- **Fails closed.** If `REVIEWER_ACCESS_CODE` or `SESSION_SECRET` is missing, too short (code at least 12 characters, secret
-  at least 32), identical to each other or reused as the Gemini key, the hosted API refuses every data request with `503`,
-  and Gemini stays off even if it is switched on.
+The hosted API runs in one of two modes, chosen by environment variables (names only: values are set in the Vercel project
+and never in the repository).
+
+- **Open access** (`PORTFOLIO_OPEN_ACCESS=1`, the current deployment). No code is asked for. Every visitor address is
+  rate-limited, and Gemini has a daily budget that falls back to the deterministic generator (see below).
+- **Reviewer access code** (when the option is off, the default). `REVIEWER_ACCESS_CODE` and `SESSION_SECRET` must be set;
+  reviewers enter the code on an access screen and receive an HMAC-signed `HttpOnly`, `SameSite=Strict` session cookie
+  (`Secure` on HTTPS, 2 hours by default). The API itself answers `401` without a session, the code is compared in constant
+  time and never stored in the browser, and the deployment fails closed (`503`, nothing served) if either value is missing,
+  too short (code under 12 or secret under 32 characters), identical to the other or reused as the Gemini key.
+
+Gemini is never enabled by accident: `PORTFOLIO_USE_LLM=1` is ignored (and an error logged) unless the deployment is either
+protected by the access code or explicitly opened with `PORTFOLIO_OPEN_ACCESS=1`. To put the gate back, remove
+`PORTFOLIO_OPEN_ACCESS` and redeploy; the stored code and secret are then used again.
 
 ### Environment variables
 
-Names only: values are set in the Vercel project (use the dashboard and mark them Sensitive) and never in the repository.
-
 | Variable | Needed | Purpose |
 |---|---|---|
-| `REVIEWER_ACCESS_CODE` | yes | The shared code reviewers type (at least 12 characters; random is best). |
-| `SESSION_SECRET` | yes | Signing secret for session cookies (at least 32 random characters; used for nothing else). |
+| `PORTFOLIO_OPEN_ACCESS` | open mode | `1` removes the access screen and applies per-visitor limits instead. |
 | `GEMINI_API_KEY` | for Gemini | Read only by the backend; never `VITE_`-prefixed, never logged and never returned. |
-| `PORTFOLIO_USE_LLM` | for Gemini | `1` enables Gemini. Ignored unless access control is active. |
-| `GEMINI_MODEL` | optional | Model name; the final evaluation used `gemini-3.5-flash-lite` (the code default is `gemini-3.8-flash`). |
-| `PORTFOLIO_SESSION_TTL_SECONDS` | optional | Session lifetime, 300 to 86400 (default 7200). |
-| `PORTFOLIO_LOGIN_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_GLOBAL_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_WINDOW_SECONDS` | optional | Login throttling (defaults: 5 per client and 60 in total per 600 s). |
-| `PORTFOLIO_ASK_PER_MINUTE`, `PORTFOLIO_API_PER_MINUTE`, `PORTFOLIO_ASK_PER_DAY` | optional | Per-session request limits (defaults: 15 and 120 per minute; the daily cap is off). |
+| `PORTFOLIO_USE_LLM` | for Gemini | `1` enables Gemini. |
+| `GEMINI_MODEL` | optional | Model name; the deployment and the final evaluation use `gemini-3.5-flash-lite` (the code default is `gemini-3.8-flash`). |
+| `PORTFOLIO_ASK_PER_DAY` | optional | Gemini questions per day **per instance** (see below). Open mode with Gemini defaults to 300. |
+| `REVIEWER_ACCESS_CODE`, `SESSION_SECRET` | access-code mode | The shared code (at least 12 characters) and the signing secret (at least 32 random characters). Ignored in open mode. |
+| `PORTFOLIO_ASK_PER_MINUTE`, `PORTFOLIO_API_PER_MINUTE` | optional | Per-visitor (or per-session) limits; defaults 15 questions and 120 other requests per minute. |
+| `PORTFOLIO_SESSION_TTL_SECONDS`, `PORTFOLIO_LOGIN_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_GLOBAL_MAX_ATTEMPTS`, `PORTFOLIO_LOGIN_WINDOW_SECONDS` | optional | Access-code mode only: session lifetime and login throttling (defaults 2 hours; 5 attempts per client and 60 in total per 600 s). |
 | `PORTFOLIO_ALLOWED_HOSTS`, `PORTFOLIO_DB_PATH` | optional | Custom domains (comma-separated) and the database location. |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | optional | A shared store for limits and sign-out (see below). |
-
-To make a random value without typing or printing it, run this in PowerShell and paste from the clipboard into the Vercel
-dashboard: `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); Set-Clipboard (($b | ForEach-Object { $_.ToString('x2') }) -join '')`.
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | optional | A shared store for the limits (see below). |
 
 ### What the limits do and do not guarantee
 
-Vercel runs several short-lived instances, so a counter held in memory is **per instance**: it slows guessing and bursts, but
-it is not a deployment-wide guarantee. A shared limit and a sign-out that holds on every instance need a shared store. The
-code supports an Upstash Redis database through its REST API and uses it only when both `UPSTASH_REDIS_REST_*` variables are
-set (it is a separate account and service that this project does not require, and nothing here enables it). If the store is
-unreachable, requests fall back to the per-instance counters and a warning is logged. The strength of the access code is the
-main defence against guessing, and every attempt, failed or not, is also bounded by Vercel's own platform limits.
+- **Per visitor.** In open mode each visitor address has its own budget (by default 15 questions and 120 other requests per
+  minute); beyond it the API answers `429` with `Retry-After`. One visitor cannot use up another's allowance.
+- **The daily Gemini budget is per instance, not a global quota.** Vercel runs several short-lived instances, each counting in
+  its own memory, and a cold start resets the count. So `PORTFOLIO_ASK_PER_DAY=300` bounds what one warm instance will send to
+  Gemini; the total across instances can be higher. Once an instance's budget is spent it does not refuse anyone: its
+  questions are answered by the deterministic generator instead.
+- **A shared limit needs a shared store.** The code supports an Upstash Redis database through its REST API and uses it only when
+  both `UPSTASH_REDIS_REST_*` variables are set. It is a separate account and service that this project does not require, and
+  nothing here enables it. If the store is unreachable, the per-instance counters apply and a warning is logged.
+- **Google's own quota applies too.** The Gemini key's project has its own per-minute and daily quota. When Google answers with
+  `429` or `503`, the SDK retries and, if the call still fails, the deterministic generator answers (both were seen while
+  load-testing the deployment).
 
 ### How the hosted demo differs from a local run
 
-- **Gemini.** With `PORTFOLIO_USE_LLM=1` and `GEMINI_API_KEY` set, free-form SQL questions are generated by Gemini on the
-  server. Its output goes through the same lexical, SQLGlot AST and read-only controls as locally; unsafe or invalid SQL is
-  rejected, and if Gemini fails, times out or is rejected, the deterministic generator answers and the response says which
-  method produced it. Without the key (or without access control) the deterministic generator answers everything.
+- **Gemini.** With `PORTFOLIO_USE_LLM=1` and `GEMINI_API_KEY` set, free-form SQL questions are generated by Gemini
+  (`gemini-3.5-flash-lite`) on the server. Its output goes through the same lexical, SQLGlot AST and read-only controls as locally;
+  unsafe or invalid SQL is rejected, and if Gemini declines, fails or times out, the deterministic generator answers and the
+  response says which method produced it. Exposure, hybrid and scenario analysis are computed deterministically and
+  independently verified, whatever Gemini does.
 - **No local intent model.** The ~90 MB classifier model is not deployed, so routing uses the deterministic keyword rules.
 - **Database.** SQLite is built from the bundled CSV files and schema in the instance's temporary directory on a cold
   start and queried through the same read-only controls as a local run. Nothing is persisted between instances and no
@@ -815,7 +818,8 @@ npm install --global vercel                       # or run it with npx
 vercel login
 vercel project create <project-name>
 # In the Vercel dashboard (Project > Settings > Environment Variables) add, for Production:
-#   REVIEWER_ACCESS_CODE, SESSION_SECRET, GEMINI_API_KEY (mark all three Sensitive), PORTFOLIO_USE_LLM=1, GEMINI_MODEL
+#   PORTFOLIO_OPEN_ACCESS=1, PORTFOLIO_USE_LLM=1, GEMINI_MODEL, PORTFOLIO_ASK_PER_DAY and GEMINI_API_KEY (mark the key Sensitive)
+#   (for access-code mode instead of open mode: REVIEWER_ACCESS_CODE and SESSION_SECRET, both Sensitive)
 vercel deploy --dry --project <project-name>      # review the file list first (see the note on .vercelignore)
 vercel deploy --prod --project <project-name>
 ```
@@ -828,13 +832,14 @@ vercel deploy --prod --project <project-name>
 
 ### Limitations of the hosted demo
 
-- **One shared code.** It controls who can use the demo; it does not identify individuals, and anyone who has the code has
-  full access. Rotate it (change the variable and redeploy) to cut off everyone.
-- **Stateless sessions.** A copied session cookie stays valid until it expires unless the shared store is configured; sign-out
-  then holds on every instance, otherwise only on the instance that handled it.
-- **Per-instance limits** unless the shared store is configured (above).
-- **The page is public; the data is not.** The static frontend bundle is served to anyone and contains no secrets or data.
-  Under Vercel's default protection, deployment-specific and preview URLs additionally redirect to a Vercel login.
+- **Open to anyone with the URL.** There is no authentication in open mode. Visitors can use the sample dataset and, within
+  the limits above, spend the Gemini key's quota. The limits are per instance and the daily budget is not a global cap; for a
+  stricter setup use the access-code mode, add the optional shared store, and set a quota alert on the key's Google project.
+- **Gemini availability.** If Google's quota or capacity is exceeded, answers come from the deterministic generator, which only
+  recognises the supplied question shapes; other questions then return "unsupported" until Gemini is available again.
+- **No individual identity.** Neither mode identifies individual users.
+- **The page is public** and contains no secrets or data. Under Vercel's default protection, deployment-specific and
+  preview URLs also redirect to a Vercel login.
 - **Sample data only.** Do not point it at real portfolio data. This is an assessment prototype, not a security-reviewed
   production service.
 
@@ -864,10 +869,10 @@ python -B -m unittest discover -s tests -t .
 | `test_answer_verifier.py` | 63 | final-answer verification: SQL / exposure / hybrid / scenario consistency, failed and unverified handling, identity and status checks, model-text labelling, exceptions, no calculation / database / second Gemini call, API and CLI |
 | `test_scenario.py` | 65 | scenario / stress testing: calculations (broad, severe, sector, positive, zero, multiple), coverage cases (partial, unmapped, bonds, no renormalisation, empty), validation (NaN, infinity, boundaries), independent verification, withholding, agent routing, CLI, API |
 | `test_routing_precedence.py` | 14 | historical / descriptive risk questions reach the SQL tool whatever the classifier suggests (classifier enabled and disabled); exposure, hybrid, scenario, SQL and official Q1-Q10 routes unchanged |
-| `test_auth.py` | 61 | reviewer access: code and signed-session checks (tampered, expired, rotated), every data endpoint blocked without a session, cookie flags, logout and revocation, cross-site refusal, login and request limits, the shared-store client (mocked), mocked-Gemini path, fallback on failure, unsafe generated SQL rejected, no secret in any response or log, and the Vercel entry point failing closed |
-| **Total** | **596** | |
+| `test_auth.py` | 77 | reviewer access (code and signed-session checks, every data endpoint blocked without a session, cookie flags, logout and revocation, cross-site refusal, login and request limits, mocked shared store) and the hosted entry point (fails closed, open mode with per-visitor limits and a daily Gemini budget that degrades to the deterministic generator), mocked-Gemini path, fallback on failure, unsafe generated SQL rejected, no secret in any response or log |
+| **Total** | **612** | |
 
-**Python: 596 passed, 0 failed, 0 skipped** (project virtual environment with all of `requirements.txt`
+**Python: 612 passed, 0 failed, 0 skipped** (project virtual environment with all of `requirements.txt`
 installed). The web frontend has its own suite (`cd frontend && npm test`): **114 Vitest tests passed**, plus
 `npx tsc --noEmit` and `npm run build`.
 
@@ -922,11 +927,11 @@ predictions.
 
 - **Access control.** Run locally, the web API (`portfolio_api`) has no authentication: it is a single-user prototype that
   binds to `127.0.0.1` and refuses other addresses. **Do not expose it to a network with real data or credentials as it
-  is.** The Vercel demo ([Deploying on Vercel](#deploying-on-vercel-reviewer-demo)) is a deliberate, restricted exception:
-  read-only sample data behind one shared reviewer access code, signed `HttpOnly` sessions, login and request limits
-  (per instance unless an optional shared store is configured), no secret in the repository or the browser, and Gemini
-  only server-side. It does not identify individual users. Any wider use would first need per-user authentication and
-  authorisation, shared rate limiting and a security review.
+  is.** The Vercel demo ([Deploying on Vercel](#deploying-on-vercel-reviewer-demo)) is a deliberate, restricted exception: it is
+  open to anyone with the URL and serves only the read-only sample data, with per-visitor request limits, a per-instance daily
+  Gemini budget (not a global quota) that falls back to the deterministic generator, no secret in the repository or the browser,
+  and Gemini only server-side. It does not identify individual users. An access-code mode is available for a stricter setup. Any
+  wider use would first need per-user authentication and authorisation, shared rate limiting and a security review.
 - **Sample data window.** Historical sample records (performance, risk, prices and transactions) cover
   **2023-09-25 to 2023-10-09**, and performance and risk records exist for 4 of the 13 portfolios. The agent does
   not provide comprehensive historical market data; period questions such as "last year" are answered from the

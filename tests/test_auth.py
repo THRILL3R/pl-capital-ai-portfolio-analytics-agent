@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import logging
 import os
 import sys
 import tempfile
@@ -661,6 +660,176 @@ class TestVercelEntryPoint(unittest.TestCase):
     def test_custom_domains_are_added_through_the_environment(self):
         app = self.build(self.env(PORTFOLIO_ALLOWED_HOSTS="demo.example.com, other.example.org"))
         self.assertEqual(TestClient(app, base_url="https://demo.example.com").get("/api/auth/session").status_code, 200)
+
+
+# ----------------------------------------------------------------------------- open access (no code) with Gemini guard rails
+
+
+class TestOpenAccessMode(Base):
+    """A demo deliberately opened to anyone: no code, but every visitor is limited and Gemini has a daily budget."""
+
+    use_llm = True
+
+    def open_client(self, *, limits=None, base_url="http://testserver"):
+        store = MemoryStore(clock=self.clock)
+        app = create_app(self.service, static_dir=Path(tempfile.gettempdir()) / "no-such-dist", auth=AuthManager(None, None), store=store,
+                         limits=limits or RequestLimits(), public_limits=True)
+        self.store = store
+        return TestClient(app, base_url=base_url)
+
+    def attach(self, client_mock):
+        self.service.sql_tool.gemini_generator = GeminiSQLGenerator(api_key=GEMINI_KEY, client=client_mock, db=self.service.db)
+
+    def test_no_code_is_required_and_the_frontend_is_told_so(self):
+        client = self.open_client()
+        self.assertEqual(client.get("/api/auth/session").json(), {"auth_required": False, "authenticated": True})
+        for method, path, body in PROTECTED:
+            self.assertEqual(call(client, method, path, body).status_code, 200, path)
+        self.assertEqual(client.get("/api/health").json()["dataset_rows"], 603)
+
+    def test_login_and_logout_are_harmless_no_ops(self):
+        client = self.open_client()
+        response = client.post("/api/auth/login", json={"code": "anything"})
+        self.assertEqual(response.json(), {"authenticated": True, "auth_required": False})
+        self.assertNotIn("set-cookie", response.headers)
+        self.assertEqual(client.post("/api/auth/logout").status_code, 200)
+
+    def test_each_visitor_address_has_its_own_question_budget(self):
+        client = self.open_client(limits=RequestLimits(ask_per_minute=3))
+        mine = {"x-forwarded-for": "198.51.100.7"}
+        self.assertEqual([client.post("/api/ask", json={"question": ASK_Q}, headers=mine).status_code for _ in range(4)], [200, 200, 200, 429])
+        blocked = client.post("/api/ask", json={"question": ASK_Q}, headers=mine)
+        self.assertGreater(int(blocked.headers["retry-after"]), 0)
+        other = {"x-forwarded-for": "198.51.100.8"}
+        self.assertEqual(client.post("/api/ask", json={"question": ASK_Q}, headers=other).status_code, 200)
+        self.clock.advance(61)
+        self.assertEqual(client.post("/api/ask", json={"question": ASK_Q}, headers=mine).status_code, 200)
+
+    def test_other_endpoints_are_limited_per_visitor_too(self):
+        client = self.open_client(limits=RequestLimits(api_per_minute=2))
+        self.assertEqual([client.get("/api/portfolios").status_code for _ in range(3)], [200, 200, 429])
+
+    def test_the_daily_budget_degrades_to_the_deterministic_generator_instead_of_refusing(self):
+        gemini = gemini_reply("SELECT COUNT(*) AS n FROM portfolios", description="count")
+        self.attach(gemini)
+        client = self.open_client(limits=RequestLimits(ask_per_day=2, ask_per_minute=50))
+        methods = []
+        for _ in range(4):
+            response = client.post("/api/ask", json={"question": ASK_Q})
+            self.assertEqual(response.status_code, 200)            # never a 429 for the budget
+            body = response.json()
+            self.assertEqual(body["status"], "success")
+            methods.append(body["result"]["generation_method"])
+        self.assertEqual(methods, ["gemini", "gemini", "rule_based", "rule_based"])
+        self.assertEqual(gemini.models.generate_content.call_count, 2)    # Gemini was not called once the budget was spent
+        self.assertTrue(self.service.sql_tool.use_gemini)                  # and it is switched back on for the next day
+
+    def test_a_degraded_answer_is_still_correct_and_verified(self):
+        self.attach(gemini_reply("SELECT 1"))
+        client = self.open_client(limits=RequestLimits(ask_per_day=1, ask_per_minute=50))
+        client.post("/api/ask", json={"question": ASK_Q})
+        result = client.post("/api/ask", json={"question": ASK_Q}).json()["result"]
+        self.assertEqual(result["rows"], [{"COUNT(*)": 13}])
+        self.assertEqual(result["answer_verification"]["status"], "verified")
+
+    def test_gemini_failures_still_fall_back_in_open_mode(self):
+        gemini = MagicMock()
+        gemini.models.generate_content.side_effect = RuntimeError(f"503 UNAVAILABLE {GEMINI_KEY}")
+        self.attach(gemini)
+        response = self.open_client().post("/api/ask", json={"question": ASK_Q})
+        result = response.json()["result"]
+        self.assertEqual((result["generation_method"], result["fallback_used"], result["rows"]), ("rule_based", True, [{"COUNT(*)": 13}]))
+        self.assertNotIn(GEMINI_KEY, response.text)
+
+    def test_unsafe_generated_sql_is_still_rejected_in_open_mode(self):
+        for unsafe in ("DROP TABLE portfolios", "SELECT * FROM sqlite_master", "SELECT 1; DELETE FROM holdings"):
+            with self.subTest(unsafe):
+                self.attach(gemini_reply(unsafe))
+                result = self.open_client().post("/api/ask", json={"question": ASK_Q}).json()["result"]
+                self.assertEqual((result["generation_method"], result["fallback_used"]), ("rule_based", True))
+        self.assertEqual(self.service.db.execute_read_only("SELECT COUNT(*) AS n FROM portfolios")["rows"], [{"n": 13}])
+
+    def test_service_can_answer_one_question_without_gemini_and_always_restores_the_switch(self):
+        gemini = gemini_reply("SELECT 1")
+        self.attach(gemini)
+        self.service.ask(ASK_Q, allow_gemini=False)
+        gemini.models.generate_content.assert_not_called()
+        self.assertTrue(self.service.sql_tool.use_gemini)
+        with patch.object(self.service.agent, "answer_question", side_effect=RuntimeError("boom")):
+            self.assertEqual(self.service.ask(ASK_Q, allow_gemini=False)["status"], "error")
+        self.assertTrue(self.service.sql_tool.use_gemini)
+
+    def test_local_use_is_unchanged_without_the_open_demo_option(self):
+        store = MemoryStore(clock=self.clock)
+        app = create_app(self.service, static_dir=Path(tempfile.gettempdir()) / "no-such-dist", auth=AuthManager(None, None), store=store, limits=RequestLimits(ask_per_minute=1))
+        client = TestClient(app)
+        self.assertEqual([client.post("/api/ask", json={"question": ASK_Q}).status_code for _ in range(4)], [200] * 4)
+
+
+@unittest.skipUnless(HAVE_FASTAPI, "FastAPI is not installed")
+class TestVercelOpenAccess(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        ensure_database()
+        cls.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls.db_path = str(Path(cls.tmp.name) / "portfolio.db")
+        cls.built = []
+        with patch.dict(os.environ, {"PORTFOLIO_DB_PATH": cls.db_path}):
+            sys.modules.pop("vercel_app", None)
+            cls.vercel_app = importlib.import_module("vercel_app")
+
+    @classmethod
+    def tearDownClass(cls):
+        for app in cls.built + [cls.vercel_app.app]:
+            app.state.service.close()
+        sys.modules.pop("vercel_app", None)
+        cls.tmp.cleanup()
+
+    def build(self, **extra):
+        env = {"PORTFOLIO_DB_PATH": self.db_path, "VERCEL": "1", "VERCEL_URL": "pl-demo.vercel.app", "PORTFOLIO_OPEN_ACCESS": "1"}
+        env.update(extra)
+        app = self.vercel_app.build_app(env)
+        self.built.append(app)
+        return app
+
+    def test_open_access_needs_no_configuration_and_serves_data(self):
+        with self.assertLogs("portfolio_api.vercel", level="WARNING"):
+            app = self.build()
+        client = TestClient(app, base_url="https://pl-demo.vercel.app")
+        self.assertEqual(client.get("/api/auth/session").json(), {"auth_required": False, "authenticated": True})
+        self.assertEqual(len(client.get("/api/portfolios").json()), 13)
+
+    def test_a_configured_code_is_ignored_in_open_mode_and_enforced_when_the_option_is_off(self):
+        env = {"REVIEWER_ACCESS_CODE": CODE, "SESSION_SECRET": SECRET}
+        open_app = self.build(**env)
+        self.assertEqual(TestClient(open_app, base_url="https://pl-demo.vercel.app").get("/api/portfolios").status_code, 200)
+        gated = self.build(PORTFOLIO_OPEN_ACCESS="0", **env)
+        self.assertEqual(TestClient(gated, base_url="https://pl-demo.vercel.app").get("/api/portfolios").status_code, 401)
+
+    def test_the_default_still_fails_closed(self):
+        app = self.build(PORTFOLIO_OPEN_ACCESS="")
+        self.assertEqual(TestClient(app, base_url="https://pl-demo.vercel.app").get("/api/portfolios").status_code, 503)
+
+    def test_gemini_runs_in_open_mode_only_with_a_daily_budget(self):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": GEMINI_KEY}):
+            app = self.build(PORTFOLIO_USE_LLM="1")
+        self.assertTrue(app.state.service.use_llm)
+        self.assertEqual(app.state.limits.ask_per_day, 300)                       # a default budget is imposed
+        with patch.dict(os.environ, {"GEMINI_API_KEY": GEMINI_KEY}):
+            custom = self.build(PORTFOLIO_USE_LLM="1", PORTFOLIO_ASK_PER_DAY="40")
+        self.assertEqual(custom.state.limits.ask_per_day, 40)                     # an explicit budget is respected
+
+    def test_gemini_still_needs_access_control_or_the_explicit_open_option(self):
+        with self.assertLogs("portfolio_api.vercel", level="ERROR"):
+            app = self.build(PORTFOLIO_OPEN_ACCESS="", PORTFOLIO_USE_LLM="1")
+        self.assertFalse(app.state.service.use_llm)
+
+    def test_open_mode_responses_never_contain_the_gemini_key(self):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": GEMINI_KEY}):
+            app = self.build(PORTFOLIO_USE_LLM="1")
+        client = TestClient(app, base_url="https://pl-demo.vercel.app")
+        for response in (client.get("/api/health"), client.get("/api/evaluation"), client.get("/api/auth/session"), client.get("/api/portfolios")):
+            self.assertNotIn(GEMINI_KEY, response.text + str(dict(response.headers)))
 
 
 if __name__ == "__main__":
