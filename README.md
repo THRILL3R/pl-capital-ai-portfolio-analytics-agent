@@ -752,7 +752,7 @@ No service calls another (the browser calls `/api/*` directly), so no service bi
 - **Database.** SQLite is built from the bundled CSV files and schema in the instance's temporary directory on a cold
   start and queried through the same read-only controls as a local run. Nothing is persisted between instances and no
   user data is stored.
-- **Evaluation page.** It reads the saved report files that ship with the repository.
+- **Evaluation page.** It reads the final live and deterministic report files that ship with the deployment.
 
 **Deploy it yourself** (PowerShell, from the repository root)
 

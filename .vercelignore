@@ -19,6 +19,13 @@ frontend/node_modules
 frontend/dist
 frontend/coverage
 
+# Reports: the Evaluation page and /api/evaluation serve only the final live and deterministic reports, so only
+# those two are uploaded (older run reports stay in the repository's docs/ but are not deployed)
+evaluation_report.md
+docs/*
+!docs/EVALUATION_FINAL_LIVE_20261109.md
+!docs/EVALUATION_DETERMINISTIC.md
+
 # Not part of the deployed application
 submission
 tests

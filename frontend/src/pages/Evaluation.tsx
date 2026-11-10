@@ -1,4 +1,4 @@
-import { CheckCheck, Database, FileSearch, Terminal } from 'lucide-react';
+import { Database, FileSearch, Terminal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError, api } from '../api/client';
 import type { EvalQuestion, EvalQuestionResult, Evaluation as EvaluationData, ReportMeta } from '../api/types';
@@ -10,17 +10,6 @@ function Result({ r, deterministicTool }: { r: EvalQuestionResult | null; determ
     <span className="inline-flex flex-col items-center gap-0.5">
       <Pill tone={r.result === 'PASS' ? 'positive' : 'negative'}>{r.result}</Pill>
       {deterministicTool && <span className="text-[10px] text-text-muted">deterministic tool</span>}
-    </span>
-  );
-}
-
-/** An earlier, superseded run: always neutral (never red/green) so an old failure cannot read as a current one. */
-function HistoricalResult({ r }: { r: EvalQuestionResult | null }) {
-  if (!r) return <span className="text-text-muted">—</span>;
-  return (
-    <span className="inline-flex flex-col items-center gap-0.5">
-      <Pill tone="neutral">{r.result}</Pill>
-      <span className="text-[10px] text-text-muted">earlier run</span>
     </span>
   );
 }
@@ -63,13 +52,10 @@ function Row({ q }: { q: EvalQuestion }) {
       <td className="px-4 py-3"><ToolPill tool={tool} /></td>
       <td className="px-4 py-3 text-center"><Result r={q.deterministic} /></td>
       <td className="px-4 py-3 text-center"><Result r={q.live} deterministicTool={q.live?.generation === 'deterministic'} /></td>
-      <td className="px-4 py-3 text-center"><HistoricalResult r={q.historical_live ?? null} /></td>
       <td className="px-4 py-3 text-xs text-text-secondary">
         <div className="flex flex-col gap-0.5">
           {q.live_failures.map((f) => <span key={f}>{f}</span>)}
-          {(q.historical_live_failures ?? []).map((f) => <span key={`h-${f}`} className="text-text-muted">Earlier run: {f}</span>)}
-          {q.targeted && <span className="flex items-center gap-1 font-medium text-text-primary"><CheckCheck size={13} aria-hidden="true" /> Targeted re-test: {q.targeted.result}</span>}
-          {!q.live_failures.length && !q.targeted && q.live && <span>Generation: {q.live.generation} · rows {q.live.rows}</span>}
+          {!q.live_failures.length && q.live && <span>Generation: {q.live.generation} · rows {q.live.rows}</span>}
         </div>
       </td>
     </tr>
@@ -85,7 +71,6 @@ export function Evaluation() {
     return () => { active = false; };
   }, []);
 
-  const subsetIds = data?.questions.filter((q) => q.targeted).map((q) => `Q${q.id} ${q.targeted!.result}`) ?? [];
   const sql = data?.questions.filter((q) => q.type === 'text2sql').length ?? 0;
   const exp = (data?.questions.length ?? 0) - sql;
 
@@ -101,7 +86,7 @@ export function Evaluation() {
       {!error && !data && <div className="card p-6"><Skeleton lines={8} /></div>}
       {data && (
         <>
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <ScoreTile label="Deterministic evaluation" meta={data.deterministic} empty="Run: python evaluate.py --report docs/EVALUATION_DETERMINISTIC.md" caption="Rule-based SQL generation; no external LLM API." />
             <ScoreTile
               label={liveLabel(data.live)}
@@ -109,24 +94,6 @@ export function Evaluation() {
               empty="Run: python evaluate.py --use-llm"
               caption={<>{data.live?.model && <code className="font-mono font-medium text-indigo-900">{data.live.model}</code>}{data.live_generation && <> · {data.live_generation.by_gemini} of {data.live_generation.sql_questions} SQL questions by Gemini · {data.live_generation.fallbacks} fallbacks</>}</>}
             />
-            <ScoreTile
-              label="Earlier live run (historical)"
-              meta={data.historical_live ?? null}
-              empty="No earlier live report is kept."
-              caption={<>Superseded by the final live evaluation; kept for the record.{data.historical_live?.model && <> <code className="font-mono font-medium text-indigo-900">{data.historical_live.model}</code></>}</>}
-            />
-            <div className="card flex flex-col justify-between p-5">
-              <div className="mb-2 text-label-sm font-bold uppercase tracking-wider text-text-muted">Targeted live re-test (historical)</div>
-              {data.live_subset && subsetIds.length ? (
-                <>
-                  <div className="text-[34px] font-extrabold leading-tight text-violet-accent sm:text-[38px]">{subsetIds.join(' · ')}</div>
-                  <p className="mt-3 rounded bg-surface-container-low/60 px-2 py-1.5 text-body-sm text-text-secondary">Subset run ({data.live_subset.total} {data.live_subset.total === 1 ? 'question' : 'questions'}), not a full evaluation.</p>
-                  {when(data.live_subset) && <p className="mt-2 text-label-sm text-text-muted">Run {when(data.live_subset)}</p>}
-                </>
-              ) : (
-                <NoData title="No targeted run on file" icon={<FileSearch size={28} aria-hidden="true" />}>Run: python evaluate.py --use-llm --questions 7</NoData>
-              )}
-            </div>
           </div>
 
           <div className="mb-6 flex items-center gap-3 rounded-xl bg-lavender-callout p-4">
@@ -149,7 +116,6 @@ export function Evaluation() {
                     <th scope="col" className="px-4 py-3">Tool routed</th>
                     <th scope="col" className="px-4 py-3 text-center">Deterministic</th>
                     <th scope="col" className="px-4 py-3 text-center">Live Gemini (final)</th>
-                    <th scope="col" className="px-4 py-3 text-center">Earlier live (historical)</th>
                     <th scope="col" className="px-4 py-3">Notes</th>
                   </tr>
                 </thead>
@@ -173,11 +139,11 @@ export function Evaluation() {
 
           <div className="mt-6">
             <Callout title="Non-deterministic execution advisory">
-              Live Gemini output is non-deterministic; each live figure is a single run. The final live run shows 10/10 and the earlier historical run 9/10, so live scores can vary between runs. The deterministic rule-based path reflects the supplied questions only.
+              Live Gemini output is non-deterministic, so the live figure is a single recorded run. The deterministic rule-based path reflects the supplied questions only.
             </Callout>
           </div>
           <p className="mt-6 text-label-sm text-text-muted">
-            Sources: {[data.deterministic, data.live, data.historical_live, data.live_subset].filter(Boolean).map((m) => m!.source).join(' · ') || 'no report files found'}
+            Sources: {[data.deterministic, data.live].filter(Boolean).map((m) => m!.source).join(' · ') || 'no report files found'}
           </p>
         </>
       )}

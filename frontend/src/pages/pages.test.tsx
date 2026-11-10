@@ -490,37 +490,30 @@ describe('Evaluation', () => {
     ],
   };
 
-  it('labels the final live 10/10, the deterministic 10/10 and the historical 9/10 separately', async () => {
-    handler = (url) => (url === '/api/health' ? HEALTH : DATA);
+  it('shows only the deterministic and final live results, never a superseded or targeted run', async () => {
+    handler = (url) => (url === '/api/health' ? HEALTH : DATA);   // the API payload still carries the older runs
     renderAt('/evaluation');
     expect(await screen.findByText('Final live Gemini evaluation')).toBeInTheDocument();
     expect(screen.getByText('Deterministic evaluation')).toBeInTheDocument();
-    expect(screen.getByText('Earlier live run (historical)')).toBeInTheDocument();
     expect(screen.getAllByText('10 / 10')).toHaveLength(2);   // final live + deterministic
-    expect(screen.getAllByText('9 / 10')).toHaveLength(1);    // the historical run only
     const finalTile = screen.getByText('Final live Gemini evaluation').closest('.card') as HTMLElement;
     expect(within(finalTile).getByText('10 / 10')).toBeInTheDocument();
-    const histTile = screen.getByText('Earlier live run (historical)').closest('.card') as HTMLElement;
-    expect(within(histTile).getByText('9 / 10')).toBeInTheDocument();
-    expect(within(histTile).getByText(/Superseded by the final live evaluation/)).toBeInTheDocument();
     expect(screen.getByText(/docs\/EVALUATION_FINAL_LIVE_20261109\.md/)).toBeInTheDocument();
-    expect(screen.getByText('Q7 PASS')).toBeInTheDocument();
     expect(screen.getByText(/8 of 8 SQL questions by Gemini · 0 fallbacks/)).toBeInTheDocument();
-    expect(screen.getByText('Earlier run: Row count mismatch: expected 8, got 13.')).toBeInTheDocument();
     const q7Row = screen.getByText('Technology value per portfolio', { exact: false }).closest('tr') as HTMLElement;
     expect(within(q7Row).getAllByText('PASS')).toHaveLength(2);          // deterministic + final live
-    expect(within(q7Row).getAllByText('earlier run')).toHaveLength(1);   // the old FAIL is captioned as an earlier run
-    expect(q7Row.className).not.toMatch(/negative/);                    // and the row is not highlighted as failing
-    expect(screen.getByText(/Targeted re-test: PASS/)).toBeInTheDocument();
+    expect(q7Row.className).not.toMatch(/negative/);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['#', 'Question', 'Tool routed', 'Deterministic', 'Live Gemini (final)', 'Notes']);
     const text = document.body.textContent ?? '';
+    for (const hidden of [/Earlier live run/, /Targeted live re-test/, /Targeted re-test/, /Earlier run/, /Superseded/, /9 \/ 10/, /Q7 PASS/, /evaluation_report\.md/, /EVALUATION_Q7_TARGETED/]) expect(text).not.toMatch(hidden);
     for (const forbidden of [/Run hash/, /95% Aggregate/, /v2\.4/, /100% Match/]) expect(text).not.toMatch(forbidden);
   });
 
   it('says plainly when a report is missing instead of inventing a score', async () => {
     handler = (url) => (url === '/api/health' ? HEALTH : { ...DATA, live: null, historical_live: null, live_generation: null, live_subset: null, questions: DATA.questions.map((q) => ({ ...q, live: null, historical_live: null, targeted: null })) });
     renderAt('/evaluation');
-    expect(await screen.findAllByText('No report on file')).toHaveLength(2);   // final live + historical live
-    expect(screen.getByText('No targeted run on file')).toBeInTheDocument();
+    expect(await screen.findAllByText('No report on file')).toHaveLength(1);   // the final live tile
+    expect(screen.queryByText('No targeted run on file')).not.toBeInTheDocument();
     expect(screen.queryByText('9 / 10')).not.toBeInTheDocument();
   });
 });

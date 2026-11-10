@@ -52,7 +52,7 @@ adds no business logic.
 | `POST /api/ask` `{question}` | Runs `PortfolioAgent.answer_question`; the response contract (`status, question, selected_tool, route_reason, result, error`) is returned as is. |
 | `POST /api/exposure` `{portfolio_name}` | Runs `ExposureCalculator.calculate`; result returned as is. |
 | `GET /api/portfolios`, `GET /api/portfolios/{id}` | Portfolio list; holdings, performance and risk records. Fixed, parameterised, read-only queries. |
-| `GET /api/evaluation` | Parses `docs/EVALUATION_FINAL_LIVE_20261109.md` (the preferred, final live run), the historical `evaluation_report.md` (earlier 9/10 run, returned separately as `historical_live`), `docs/EVALUATION_DETERMINISTIC.md` and `docs/EVALUATION_Q7_TARGETED.md`, and merges the ground-truth question text. Each report is classified by the mode recorded inside it, so a deterministic run can never appear as live evidence. |
+| `GET /api/evaluation` | Parses `docs/EVALUATION_FINAL_LIVE_20261109.md` (the preferred, final live run) and `docs/EVALUATION_DETERMINISTIC.md`, and merges the ground-truth question text. Older run reports, when present, are returned separately but the Evaluation page does not display them. Each report is classified by the mode recorded inside it, so a deterministic run can never appear as live evidence. |
 | `GET /api/health` | Booleans and a dataset row count only. |
 
 Safeguards: loopback-only binding (a non-loopback `--host` is refused), `Host` header allow-list, input length
